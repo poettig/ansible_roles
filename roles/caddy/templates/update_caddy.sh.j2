@@ -38,7 +38,7 @@ git_releases=$(curl -L https://api.github.com/repos/caddyserver/caddy/releases 2
 git_version=$(echo "$git_releases" | jq -r 'first(.[] | select(.prerelease==false)) | .tag_name') || { echo "Failed to get latest version number from releases."; exit 1; }
 git_changelog_url=$(echo "$git_releases" | jq -r 'first(.[] | select(.prerelease==false)) | .html_url')
 
-if [[ "$old_version" != "$git_version" || "$1" == "-f" ]]; then
+if [[ "$old_version" != "$git_version" || "$1" == "-f" ]] || [ -f "$HOME/.force_rebuild" ]; then
 	if ! do_update; then
 		echo
 		echo "Caddy update failed."
