@@ -1,0 +1,9 @@
+[Unit]
+Description=Try to update caddy once per day sometime between 5:00 and 6:00
+
+[Timer]
+OnCalendar={{ caddy_updater_oncalendar }}
+RandomizedDelaySec={{ caddy_updater_randomizeddelaysec }}
+
+[Install]
+WantedBy=timers.target

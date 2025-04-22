@@ -6,7 +6,7 @@
       - jq
 
 - name: Create user caddy
-  user:
+  ansible.builtin.user:
     name: caddy
     shell: /usr/bin/nologin
 
@@ -42,7 +42,6 @@
     owner: caddy
     group: caddy
     mode: 0700
-  register: caddy_update_deploy
 
 - name: Allow user caddy to restart caddy
   community.general.sudoers:
@@ -54,31 +53,21 @@
 - name: Install caddy via updater
   become: yes
   become_user: caddy
-  command:
-    cmd: "{{ caddy_executables_directory }}/update_caddy.sh -f"
-    creates: "{% if caddy_update_deploy.changed %}/this_does_never_exist{% else %}{{ caddy_executables_directory }}/caddy{% endif %}"
+  ansible.builtin.command:
+    cmd: "{{ caddy_executables_directory }}/update_caddy.sh{% if caddy_updater_force_rebuild %} -f{% endif %}"
+    creates: "{% if caddy_updater_force_rebuild %}/this_does_never_exist{% else %}{{ caddy_executables_directory }}/caddy{% endif %}"
   ignore_errors: "{{ ansible_check_mode }}"
   # No notify, the updater script restarts the service itself
 
-- name: Setup timed systemd update job
-  include_role:
-    name: systemd
-  vars:
-    systemd_name: caddy-updater
-    systemd_script_owner: caddy
-    systemd_script_group: caddy
-    systemd_service_description: Update caddy to newest version
-    systemd_service_options:
-      ExecStart: "{{ caddy_executables_directory }}/update_caddy.sh"
-      User: caddy
-      Group: caddy
-    systemd_notify:
-      failed: true
-      success: true
-    systemd_timer_description: "Try to update caddy once per day sometime between 5:00 and 6:00"
-    systemd_timer_options:
-      OnCalendar: "*-*-* 05:00"
-      RandomizedDelaySec: 3600
+- name: Install caddy updater service
+  template:
+    src: caddy-updater.service.j2
+    dest: /etc/systemd/system/caddy-updater.service
+
+- name: Install caddy updater timer
+  template:
+    src: caddy-updater.timer.j2
+    dest: /etc/systemd/system/caddy-updater.timer
 
 - name: Create caddy config directory
   file:
@@ -108,8 +97,20 @@
   when: caddy_webroot is defined
 
 - name: Enable caddy
-  service:
+  ansible.builtin.service:
     name: caddy
+    enabled: yes
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Enable caddy updater
+  ansible.builtin.systemd_service:
+    name: caddy-updater
+    enabled: yes
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Enable caddy updater timer
+  ansible.builtin.systemd_service:
+    name: caddy-updater.timer
     enabled: yes
   ignore_errors: "{{ ansible_check_mode }}"
 

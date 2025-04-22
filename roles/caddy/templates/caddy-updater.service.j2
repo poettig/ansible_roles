@@ -1,0 +1,15 @@
+# /etc/systemd/system/caddy-updater.service
+[Unit]
+Description=Update caddy to newest version
+{% if caddy_updater_on_failure_service %}
+OnFailure={{ caddy_updater_on_failure_service }}@%n
+{% endif %}
+{% if caddy_updater_on_success_service %}
+OnSuccess={{ caddy_updater_on_success_service }}@%n
+{% endif %}
+
+[Service]
+ExecStart={{ caddy_executables_directory }}/update_caddy.sh
+User=caddy
+Group=caddy
+Type=oneshot
