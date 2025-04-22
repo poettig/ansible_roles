@@ -45,6 +45,10 @@ if [[ "$old_version" != "$git_version" || "$1" == "-f" ]] || [ -f "$HOME/.force_
 		exit 1
 	fi
 
+	if rm "$HOME/.force_rebuild"; then
+		echo "Deleted force rebuild flag file."
+	fi
+
 	echo
 	echo "Finished update, restarting caddy..."
 
