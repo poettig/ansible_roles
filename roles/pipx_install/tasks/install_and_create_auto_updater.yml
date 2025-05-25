@@ -1,0 +1,41 @@
+---
+
+- name: Ensure that git urls contain an explicit name
+  fail:
+    msg: "Please make sure that '{{ pipx_install_package }}' is prefixed py the package name, i.e. '<package name>@{{ pipx_install_package }}'."
+  when:
+    - "'git+' in pipx_install_package"
+    - pipx_install_package is not regex("^\w+\s+@\s+git\+.*$")
+
+- name: "Install pipx package {{ pipx_install_package }}"
+  become: true
+  become_user: "{{ pipx_install_user }}"
+  community.general.pipx:
+    name: "{{ pipx_install_package }}"
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Generate necessary alternative python package names
+  set_fact:
+    pipx_install_package_name_for_service: "{{ pipx_install_package | regex_replace('\\[', '-') | regex_replace('\\]$', '') | regex_replace('\\s+@\\s+git\\+.*$', '')}}"
+    pipx_install_package_name_only: "{{ pipx_install_package | regex_replace('\\[.*?\\]$', '') | regex_replace('\\s+@\\s+git\\+.*$', '') }}"
+
+- name: "Create auto updater entry for package {{ pipx_install_package }} under user {{ pipx_install_user }}"
+  include_role:
+    name: systemd
+  vars:
+    systemd_name: "pipx-upgrade-{{ pipx_install_package_name_for_service }}-{{ pipx_install_user }}"
+    systemd_service_description: "Regularly upgrade {{ pipx_install_package }} via pipx"
+    systemd_service_options:
+      User: "{{ pipx_install_user }}"
+      Group: "{{ pipx_install_user }}"
+      ExecStart: "/usr/bin/bash -c 'result=$(pipx upgrade -f '{{ pipx_install_package_name_only }}' 2>&1) && { echo \"$result\" | rg -C 1000 upgraded; true; } || { echo \"$result\"; false; }'"
+    systemd_notify:
+      failed: true
+      success: true
+    systemd_timer_description: "Run pipx-upgrade-{{ pipx_install_package_name_for_service }}-{{ pipx_install_user }} every day"
+    systemd_timer_options:
+      OnCalendar: "*-*-* 00:30"
+      OnStartupSec: "1s"
+      AccuracySec: "1s"
+      RandomizedDelaySec: "30m"
+      Persistent: true
