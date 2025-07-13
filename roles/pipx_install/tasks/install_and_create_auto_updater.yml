@@ -5,7 +5,7 @@
     msg: "Please make sure that '{{ pipx_install_package }}' is prefixed py the package name, i.e. '<package name>@{{ pipx_install_package }}'."
   when:
     - "'git+' in pipx_install_package"
-    - pipx_install_package is not regex("^\w+\s+@\s+git\+.*$")
+    - pipx_install_package is not regex("^[A-Za-z0-9-_]+\s+@\s+git\+.*$")
 
 - name: "Install pipx package {{ pipx_install_package }}"
   become: true
