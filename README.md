@@ -17,3 +17,11 @@ collections:
     version: 1.0.0
     type: git
 ```
+
+### Development
+
+Symlink this collection to the `collections/ansible_collections` of the ansible repo you are using for development.
+
+```
+mkdir -p collections/ansible_collections/poettig; ln -s <path to the ansible_roles checkout> collections/ansible_collections/poettig/roles
+```
