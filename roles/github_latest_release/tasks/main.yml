@@ -1,0 +1,24 @@
+---
+
+- name: "Get latest release info for {{ github_latest_release_project_path }}"
+  check_mode: false  # Always run, even in check mode
+  ansible.builtin.uri:
+    url: "https://api.github.com/repos/{{ github_latest_release_project_path }}/releases/latest"
+    return_content: true
+    body_format: json
+  register: github_latest_release_info
+
+- name: Fail if asset regex matches nothing
+  ansible.builtin.fail:
+    msg: "'{{ github_latest_release_asset_name_regex }}' does not match any asset name. Available asset names: {{ github_latest_release_info.json.assets | map(attribute='name') | join(', ') }}"
+  when:  (github_latest_release_info.json.assets | selectattr('name', 'search', github_latest_release_asset_name_regex)) | length == 0
+
+
+- name: "Set up extra variables for often necessary information"
+  ansible.builtin.set_fact:
+    "{{ github_latest_release_role_name }}_github_latest_release_info": "{{ github_latest_release_info.json }}"
+    "{{ github_latest_release_role_name }}_github_latest_release_name": "{{ github_latest_release_info.json.name }}"
+    "{{ github_latest_release_role_name }}_github_latest_release_tag_name": "{{ github_latest_release_info.json.tag_name }}"
+    "{{ github_latest_release_role_name }}_github_latest_release_version": "{{ github_latest_release_info.json.tag_name.removeprefix(github_latest_release_version_prefix) }}"
+    "{{ github_latest_release_role_name }}_github_latest_release_asset_name": "{{ (github_latest_release_info.json.assets | selectattr('name', 'search', github_latest_release_asset_name_regex) | first).name }}"
+    "{{ github_latest_release_role_name }}_github_latest_release_asset_download_url": "{{ (github_latest_release_info.json.assets | selectattr('name', 'search', github_latest_release_asset_name_regex) | first).browser_download_url }}"
