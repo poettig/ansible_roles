@@ -97,9 +97,10 @@
   when: caddy_webroot is defined
 
 - name: Enable caddy
-  ansible.builtin.service:
+  ansible.builtin.systemd_service:
     name: caddy
-    enabled: yes
+    enabled: true
+    daemon_reload: true
   ignore_errors: "{{ ansible_check_mode }}"
 
 - name: Enable caddy updater
@@ -120,7 +121,7 @@
   loop_control:
     loop_var: caddy_global_directive_config
     label: "{{ caddy_global_directive_config.template }}"
-  when: lookup('ansible.builtin.varnames', 'caddy_global_directive_configs')
+  when: lookup('ansible.builtin.varnames', 'caddy_global_directive_configs') | length > 0
 
 - name: Install caddy site configs provided by caller
   include_tasks: add_site_config.yml
@@ -128,7 +129,7 @@
   loop_control:
     loop_var: caddy_site_config
     label: "{{ caddy_site_config.template }}"
-  when: lookup('ansible.builtin.varnames', 'caddy_site_configs')
+  when: lookup('ansible.builtin.varnames', 'caddy_site_configs') | length > 0
 
 - name: Install caddy subconfigs provided by caller
   include_tasks: add_generic_subconfig.yml
@@ -136,4 +137,4 @@
   loop_control:
     loop_var: caddy_generic_subconfig
     label: "{{ caddy_generic_subconfig.template }}"
-  when: lookup('ansible.builtin.varnames', 'caddy_subconfigs')
+  when: lookup('ansible.builtin.varnames', 'caddy_subconfigs') | length > 0
