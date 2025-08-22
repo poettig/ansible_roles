@@ -24,6 +24,7 @@
     path: "{{ pipx_install_user_info.home }}/.bashrc"
     insertbefore: "BOF"
     line: "export PATH={{ pipx_install_user_info.home }}/.local/bin:$PATH"
+  ignore_errors: "{{ ansible_check_mode }}"
 
 - name: "Install packages and create auto updater entries for user {{ pipx_install_user }}"
   ansible.builtin.include_tasks: install_and_create_auto_updater.yml
