@@ -21,7 +21,9 @@
     # The python executable in a venv is a symlink, follow it
     follow: true
   register: python_venv_python_stat
-  when: python_venv_directory_stat.stat.exists and python_venv_directory_stat.stat.isdir
+  when:
+    - python_venv_directory_stat.stat.exists
+    - python_venv_directory_stat.stat.isdir
 
 - name: Check if pip in the venv still works
   command:
@@ -30,25 +32,33 @@
   changed_when: false
   failed_when: false
   register: python_venv_pip_result
-  when: python_venv_directory_stat.stat.exists and python_venv_directory_stat.stat.isdir
+  when:
+    - python_venv_directory_stat.stat.exists
+    - python_venv_directory_stat.stat.isdir
 
 # As the python executable in a venv is a symlink to /usr/bin/pythonX.XX, it will break if the system python is upgraded
 - name: Remove old venv if it is invalid
   file:
     path: "{{ python_venv_directory }}"
     state: absent
-  when: python_venv_directory_stat.stat.exists and (not (python_venv_python_stat.stat.exists and python_venv_python_stat.stat.executable) or python_venv_pip_result.rc == 1)
+  when:
+    - python_venv_directory_stat.stat.exists
+    - not (python_venv_python_stat.stat.exists and python_venv_python_stat.stat.executable) or python_venv_pip_result.rc != 0
 
 - name: Install requirements from package list
   pip:
     virtualenv: "{{ python_venv_directory }}"
     name: "{{ python_venv_modules }}"
   notify: "{{ python_venv_handlers_to_notify }}"
-  when: python_venv_modules is defined and not ansible_check_mode
+  when:
+    - python_venv_modules is defined
+    - not ansible_check_mode
 
 - name: Install requirements from requirements file
   pip:
     virtualenv: "{{ python_venv_directory }}"
     requirements: "{{ python_venv_requirements_file }}"
   notify: "{{ python_venv_handlers_to_notify }}"
-  when: python_venv_requirements_file is defined and not ansible_check_mode
+  when:
+    - python_venv_requirements_file is defined
+    - not ansible_check_mode
