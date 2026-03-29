@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+
+status="Success"
+while getopts s:f flag; do
+	case "${flag}" in
+		s) service=${OPTARG} ;;
+		f) status="**Failed**" ;;
+		*) echo "Invalid argument"; exit 1 ;;
+	esac
+done
+
+InvocationID=$(systemctl show --value -p InvocationID "$service")
+if [[ $(journalctl -q --no-hostname _SYSTEMD_INVOCATION_ID="$InvocationID" | wc -l) -eq 0 ]]; then
+	# No messages printed in this invocation
+	echo "No messages in journald for the most recent invocation of $service, not sending notification."
+	exit 0
+fi
+
+read -r -d '' message << EOF
+Hostname: \`$(hostname -f)\`
+Service: \`$service\`
+Status: $status
+
+\`\`\`
+$(journalctl -q --no-hostname _SYSTEMD_INVOCATION_ID="$InvocationID" | tail -c 15000)
+\`\`\`
+EOF
+
+# `jq -Rsa .` converts the message into a json-compatible value including quotes around it
+echo -n "{\"message\": $(echo "$message" | jq -Rsa .), \"rooms\": [\"peet\"]}" | curl -s -X POST http://localhost:3578/send-markdown -H "Content-Type: application/json" --output /dev/null --data-binary @-

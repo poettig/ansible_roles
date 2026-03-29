@@ -1,0 +1,47 @@
+---
+
+- name: "Load OS dependent variables"
+  ansible.builtin.include_vars:
+    file: "{{ ansible_facts['distribution'] | lower }}.yml"
+  failed_when: false  # never fail, even if the file does not exist
+
+- name: "Install fuse3"
+  ansible.builtin.package:
+    name: "{{ backup_borg_system_dependencies }}"
+    state: present
+
+- name: "Get information about user {{ backup_borg_install_user }}"
+  ansible.builtin.user:
+    name: "{{ backup_borg_install_user }}"
+  register: backup_borg_install_user_info
+
+- name: "Install borg for user {{ backup_borg_install_user }}"
+  ansible.builtin.include_role:
+    name: "poettig.roles.pipx_install"
+  vars:
+    pipx_install_packages:
+      - borgbackup[pyfuse3]
+    pipx_install_user: "{{ backup_borg_install_user }}"
+
+- name: "Ensure that config directory for borg exists for user {{ backup_borg_install_user }}"
+  ansible.builtin.file:
+    path: "{{ backup_borg_install_user_info.home }}/{{ dirname }}"
+    state: directory
+    owner: "{{ backup_borg_install_user_info.name }}"
+    group: "{{ backup_borg_install_user_info.group }}"
+    mode: 0755
+  ignore_errors: "{{ ansible_check_mode }}"
+  loop_control:
+    loop_var: dirname
+  loop:
+    - ".config"
+    - ".config/borg"
+
+- name: "Install borg logging.conf for user {{ backup_borg_install_user }}"
+  ansible.builtin.copy:
+    src: "logging.conf"
+    dest: "{{ backup_borg_install_user_info.home }}/.config/borg/"
+    owner: "{{ backup_borg_install_user_info.name }}"
+    group: "{{ backup_borg_install_user_info.group }}"
+    mode: 0600
+  ignore_errors: "{{ ansible_check_mode }}"

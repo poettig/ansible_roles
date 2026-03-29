@@ -1,0 +1,9 @@
+---
+
+podman_package_dependencies:
+  - podman
+  - uidmap
+  - slirp4netns
+  - fuse-overlayfs
+  - passt  # The package that contains pasta, what a shitty name
+

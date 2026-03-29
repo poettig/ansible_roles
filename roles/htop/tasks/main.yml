@@ -1,0 +1,10 @@
+---
+
+- name: "Install htop"
+  ansible.builtin.package:
+    name: "htop"
+    state: present
+    
+- name: "Configure htop for each requested user"
+  ansible.builtin.include_tasks: configure_htop.yml
+  loop: "{{ lookup('community.general.merge_variables', 'htop_users', pattern_type='prefix') }}"

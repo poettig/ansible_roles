@@ -1,0 +1,11 @@
+[Unit]
+Description=Run mail2notify
+After=network.target network-online.target
+
+[Service]
+Type=simple
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/local/bin/mail2notify.py
+
+[Install]
+WantedBy=multi-user.target

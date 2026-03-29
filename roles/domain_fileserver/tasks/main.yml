@@ -1,0 +1,7 @@
+---
+
+- name: "Deploy domain fileserver"
+  ansible.builtin.include_tasks: domain.yml
+  loop: "{{ domain_fileserver_domains }}"
+  loop_control:
+    label: "{{ item.domain }}"

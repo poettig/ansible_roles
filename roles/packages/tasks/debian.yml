@@ -1,0 +1,5 @@
+---
+
+- name: "Install useful packages on Debian"
+  ansible.builtin.apt:
+    name: "{{ packages_merged_list }}"

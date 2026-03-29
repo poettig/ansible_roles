@@ -1,0 +1,8 @@
+---
+
+# Allow unconfigured smtp by setting everything to "omit"
+vaultwarden_smtp_host: "{{ omit }}"
+vaultwarden_smtp_from: "{{ omit }}"
+vaultwarden_smtp_from_name: "{{ omit }}"
+vaultwarden_smtp_username: "{{ omit }}"
+vaultwarden_smtp_password: "{{ omit }}"

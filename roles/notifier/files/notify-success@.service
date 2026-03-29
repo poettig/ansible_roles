@@ -1,0 +1,8 @@
+[Unit]
+Description=Run systemd-notifier for successful service %i
+Wants=network-online.target
+After=network.target network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/systemd-notifier -s %i

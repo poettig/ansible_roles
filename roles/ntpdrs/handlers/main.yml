@@ -1,0 +1,7 @@
+---
+
+- name: "Restart ntpd-rs"
+  ansible.builtin.systemd_service:
+    name: "ntpd-rs"
+    state: restarted
+  ignore_errors: "{{ ansible_check_mode }}"

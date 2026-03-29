@@ -1,0 +1,38 @@
+---
+
+- name: "Create www directory for domain"
+  ansible.builtin.file:
+    path: "/var/www/{{ item.domain }}"
+    state: directory
+    owner: "caddy"
+    group: "caddy"
+    mode: 0750
+
+- name: "Create .well-known directory"
+  ansible.builtin.file:
+    path: "/var/www/{{ item.domain }}/.well-known"
+    state: directory
+    owner: "caddy"
+    group: "caddy"
+    mode: 0750
+
+- name: "Create security.txt"
+  ansible.builtin.copy:
+    dest: "/var/www/{{ item.domain }}/.well-known/security.txt"
+    content: |
+      Contact: mailto:{{ item.security_txt_mailto }}
+      Expires: 2099-12-31T23:00:00.000Z
+      Preferred-Languages: en, de
+      Canonical: https://{{ item.domain }}/.well-known/security.txt
+    owner: "caddy"
+    group: "caddy"
+    mode: 0640
+
+- name: "Add site config to caddy"
+  ansible.builtin.include_role:
+    name: "poettig.roles.caddy"
+    tasks_from: add_site_config.yml
+  vars:
+    caddy_site_config:
+      template: "domain.conf.j2"
+      target_filename: "{{ item.domain }}.conf"

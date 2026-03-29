@@ -1,6 +1,6 @@
 ---
 
-- name: Install caddy site configs
-  include_tasks: add_generic_subconfig.yml
+- name: "Install caddy site configs"
+  ansible.builtin.include_tasks: add_generic_subconfig.yml
   vars:
     caddy_generic_subconfig: "{{ caddy_site_config | combine({'directory': 'sites.d'}) }}"

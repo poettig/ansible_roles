@@ -2,7 +2,7 @@
 
 # There are no actual quotes, just jinja2
 # shellcheck disable=SC2089
-XCADDY_BUILD="/tmp/xcaddy build{{ [' --with'] | product(caddy_modules | default([])) | map('join', ' ') | join('') }} --output {{ caddy_executables_directory }}/caddy"
+XCADDY_BUILD="/tmp/xcaddy build{{ [' --with'] | product(query('community.general.merge_variables', 'caddy_modules', pattern_type='prefix') | flatten) | map('join', ' ') | join('') }} --output {{ caddy_executables_directory }}/caddy"
 
 do_update() {
 	curl -s https://api.github.com/repos/caddyserver/xcaddy/releases/latest | jq -r '.assets[] | select(.name | contains("linux_amd64.tar.gz")) | .browser_download_url' | wget -q -i - -O - | tar xzf - -C /tmp;

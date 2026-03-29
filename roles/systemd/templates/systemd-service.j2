@@ -1,0 +1,43 @@
+[Unit]
+Description={{ systemd_service_description }}
+{% if systemd_unit_options is defined %}
+{% for k,v in systemd_unit_options.items() %}
+{{ k }}={{ v }}
+{% endfor %}
+{% endif %}
+{% if systemd_notify is defined and "failed" in systemd_notify and systemd_notify.failed %}
+OnFailure=notify-failure@%n
+{% endif %}
+{% if systemd_notify is defined and "success" in systemd_notify and systemd_notify.success %}
+OnSuccess=notify-success@%n
+{% endif %}
+
+[Service]
+{% if systemd_service_options is defined %}
+{% for key, value in systemd_service_options.items() %}
+{% if value is iterable and value is not string %}
+{% if value is mapping %}
+{% for subkey, subvalue in value.items() %}
+{{ key }}={{ subkey }}={{ subvalue }}
+{% endfor %}
+{% else %}
+{% for entry in value | reject('eq', '') %}
+{{ key }}={{ entry }}
+{% endfor %}
+{% endif %}
+{% else %}
+{{ key }}={{ value }}
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if systemd_timer_options is defined %}
+Type=oneshot
+{% endif %}
+{% if systemd_script_destination is defined %}
+ExecStart={{ systemd_script_destination }} {{ systemd_script_arguments | default('') }}
+{% endif %}
+
+{% if systemd_service_enable or systemd_service_can_be_enabled %}
+[Install]
+WantedBy=multi-user.target
+{% endif %}

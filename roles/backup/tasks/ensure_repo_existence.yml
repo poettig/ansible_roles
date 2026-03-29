@@ -1,0 +1,36 @@
+---
+
+- name: "Run `borg info` to check for repo existence"
+  ansible.builtin.command: "borg info {{ item }}"
+  environment:
+    BORG_EXIT_CODES: "modern"
+    BORG_RSH: "ssh -i ~/.ssh/backup_ed25519 -o StrictHostKeyChecking=accept-new"
+    BORG_PASSPHRASE: ""
+  register: backup_borg_info_result
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: "Init repo if the folder exists, but there is no borg repo in it"  # noqa: no-changed-when - way too complicated too change right now, maybe future-me will have the endurance
+
+  ansible.builtin.command: "borg init -e repokey-blake2 {{ item }}"
+  environment:
+    BORG_RSH: "ssh -i ~/.ssh/backup_ed25519 -o StrictHostKeyChecking=accept-new"
+    BORG_PASSPHRASE: "{{ backup_passphrase }}"
+  register: backup_repo_init_result
+  when: backup_borg_info_result.rc == 15  # Modern exit code for "invalid repository"
+
+- name: "Fail in all other cases"
+  ansible.builtin.fail:
+    msg: >-
+      {{ item }} does not exist.
+      If the entry is on a self-hosted backup target, you might need to run
+      `ansible-playbook main.yml -t create-backup-ssh-key,create-backup-repos-on-backup-target`, then try again.
+      Failure information: {{ backup_borg_info_result }}
+  when:
+    - not ansible_check_mode
+    - "'skipped' in backup_repo_init_result"
+    # Don't fail if the repo-init task was not skipped (== the "when" condition matched).
+    - backup_repo_init_result.skipped
+    # RC 52 is "password wrong", 73 is "failed to acquire lock", which are expected outcomes for an existing repository.
+    - backup_borg_info_result.rc not in [52, 73]

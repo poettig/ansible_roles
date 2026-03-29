@@ -1,0 +1,6 @@
+---
+
+- name: "Send test message"
+  ansible.builtin.command:
+    cmd: "/usr/local/bin/notifier.py 'notifier.py Ansible Installer' 'notifier.py installed on {{ inventory_hostname }}' peet"
+  changed_when: true

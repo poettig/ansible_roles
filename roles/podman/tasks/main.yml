@@ -1,0 +1,29 @@
+---
+
+- name: "Load OS dependent variables"
+  ansible.builtin.include_vars:
+    file: "{{ ansible_facts['distribution'] | lower }}.yml"
+  failed_when: false  # never fail, even if the file does not exist
+
+- name: "Install podman and dependencies"
+  ansible.builtin.package:
+    name: "{{ podman_package_dependencies }}"
+
+- name: "Install /etc/containers/containers.conf"
+  ansible.builtin.copy:
+    dest: "/etc/containers/containers.conf"
+    content: |
+      [engine]
+      cgroup_manager = "cgroupfs"
+    mode: 0644
+
+- name: "Install /etc/containers/storage.conf"
+  ansible.builtin.copy:
+    dest: "/etc/containers/storage.conf"
+    content: |
+      [storage]
+      driver = "overlay"
+      runroot = "/run/containers/storage"
+      graphroot = "/var/lib/containers/storage"
+      rootless_storage_path = "$HOME/.local/share/containers/storage"
+    mode: 0644

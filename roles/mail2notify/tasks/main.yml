@@ -1,0 +1,44 @@
+---
+
+- name: "Check if notifier is installed"
+  ignore_errors: "{{ ansible_check_mode }}"
+  block:
+    - name: "Get stat of notifier.py"
+      ansible.builtin.stat:
+        path: "/usr/local/bin/notifier.py"
+      register: mail2notify_notifier_stat
+
+    - name: "Assert that notifier.py exists"
+      ansible.builtin.assert:
+        that: mail2notify_notifier_stat.stat.exists
+        msg: "/usr/local/bin/notifier.py does not exist, please make sure that the notifier role ran already."
+
+- name: "Create venv for mail2notify"
+  ansible.builtin.include_role:
+    name: "poettig.roles.python_venv"
+  vars:
+    python_venv_directory: "/var/lib/mail2notify/venv"
+    python_venv_modules:
+      - requests
+    python_venv_handlers_to_notify: "Restart mail2notify"
+
+- name: "Deploy mail2notify.py"
+  ansible.builtin.copy:
+    src: "mail2notify.py"
+    dest: "/usr/local/bin/"
+    mode: 0700
+  notify: "Restart mail2notify"
+
+- name: "Deploy systemd service for mail2notify"
+  ansible.builtin.copy:
+    src: "mail2notify.service"
+    dest: "/etc/systemd/system/"
+    mode: 0644
+  notify: "Restart mail2notify"
+
+- name: "Enable mail2notify.service"
+  ansible.builtin.systemd_service:
+    name: "mail2notify"
+    enabled: true
+  notify: "Restart mail2notify"
+  ignore_errors: "{{ ansible_check_mode }}"

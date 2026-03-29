@@ -1,0 +1,20 @@
+---
+
+caddy_site_configs_inventory_hostname: >-
+  {{
+    query('ansible.builtin.filetree', 'templates/caddy/sites/' + inventory_hostname)
+    | community.general.json_query("[].{template: src}")
+  }}
+caddy_site_configs_groups: >-
+  {{
+    'templates/caddy/sites/**/*'
+    | ansible.builtin.fileglob
+    | select('ansible.builtin.search', '/' + (group_names | join('|')) + '/')
+    | map('community.general.dict_kv', 'template')
+  }}
+caddy_subconfigs_additional_directives_inventory_hostname: >-
+  {{
+    query('ansible.builtin.filetree', 'templates/caddy/additional-directives/' + inventory_hostname)
+    | map('combine', {'inventory_hostname': inventory_hostname})
+    | community.general.json_query("[].{template: src, directory: join('', ['sites.d/', inventory_hostname, '-directives.d'])}")
+  }}

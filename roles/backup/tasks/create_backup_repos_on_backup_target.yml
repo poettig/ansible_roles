@@ -1,0 +1,33 @@
+---
+
+- name: "Create user for backup repos"
+  ansible.builtin.user:
+    name: "backup"
+    home: "{{ backup_repos_homedir }}"
+    skeleton: "/etc/skel"
+    shell: "/usr/bin/bash"
+  register: backup_user_info
+
+- name: "Install borg for backup user"
+  ansible.builtin.include_tasks: install_borg.yml
+  vars:
+    backup_borg_install_user: "{{ backup_user_info.name }}"
+
+- name: Create authorized_keys entries allowing full access to backups
+  ansible.posix.authorized_key:
+    user: "{{ backup_user_info.name }}"
+    state: present
+    key: "{{ item }}"
+  ignore_errors: "{{ ansible_check_mode }}"
+  loop: "{{ backup_full_access_keys_from | map('extract', ssh_keys) | flatten }}"
+
+# Necessary for borg_compact.sh script
+- name: "Allow BORGPP env var to be forwarded"
+  ansible.builtin.copy:
+    src: "accept_borgpp.conf"
+    dest: "/etc/ssh/sshd_config.d/accept_borgpp.conf"
+    mode: 0644
+
+- name: "Create repo for each backup client"
+  ansible.builtin.include_tasks: create_backup_repo_on_backup_target.yml
+  loop: "{{ backup_client_hosts }}"

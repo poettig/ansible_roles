@@ -1,0 +1,13 @@
+---
+
+- name: "Get info about latest chezmoi release"
+  ansible.builtin.include_role:
+    name: "poettig.roles.github_latest_release"
+  vars:
+    github_latest_release_role_name: "chezmoi"
+    github_latest_release_project_path: "twpayne/chezmoi"
+    github_latest_release_asset_name_regex: "amd64.deb$"
+
+- name: "Install chezmoi"
+  ansible.builtin.apt:
+    deb: "{{ chezmoi_github_latest_release_asset_download_url }}"

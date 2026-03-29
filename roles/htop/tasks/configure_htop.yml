@@ -1,0 +1,79 @@
+---
+
+- name: "Get user info for user {{ item }}"
+  ansible.builtin.getent:
+    database: "passwd"
+    key: "{{ item }}"
+  register: htop_user_info
+
+- name: "Adapt htop left column for user {{ item }}"
+  ansible.builtin.lineinfile:
+    dest: "{{ htop_user_info.ansible_facts.getent_passwd[item][4] }}/.config/htop/htoprc"
+    create: true
+    regexp: "^left_meters="
+    line: "left_meters={% if ansible_facts['processor_vcpus'] <= 6 %}LeftCPUs{% else %}LeftCPUs2{% endif %} CPU Memory Swap"
+    mode: 0600
+
+- name: "Adapt htop left column mode for user {{ item }}"
+  ansible.builtin.lineinfile:
+    dest: "{{ htop_user_info.ansible_facts.getent_passwd[item][4] }}/.config/htop/htoprc"
+    create: true
+    regexp: "^left_meter_modes="
+    line: "left_meter_modes=1 1 1 1"
+    mode: 0600
+
+- name: "Adapt htop right column for user {{ item }}"
+  ansible.builtin.lineinfile:
+    dest: "{{ htop_user_info.ansible_facts.getent_passwd[item][4] }}/.config/htop/htoprc"
+    create: true
+    regexp: "^right_meters="
+    line: "right_meters={% if ansible_facts['processor_vcpus'] <= 6 %}RightCPUs{% else %}RightCPUs2{% endif %} Tasks LoadAverage Uptime"
+    mode: 0600
+
+- name: "Adapt htop right column mode for user {{ item }}"
+  ansible.builtin.lineinfile:
+    dest: "{{ htop_user_info.ansible_facts.getent_passwd[item][4] }}/.config/htop/htoprc"
+    create: true
+    regexp: "^right_meter_modes="
+    line: "right_meter_modes=1 2 2 2"
+    mode: 0600
+
+- name: "Adapt htop cpu numbering for user {{ item }}"
+  ansible.builtin.lineinfile:
+    dest: "{{ htop_user_info.ansible_facts.getent_passwd[item][4] }}/.config/htop/htoprc"
+    create: true
+    regexp: "^cpu_count_from_one="
+    line: "cpu_count_from_one=0"
+    mode: 0600
+
+- name: "Adapt htop cpu details mode for user {{ item }}"
+  ansible.builtin.lineinfile:
+    dest: "{{ htop_user_info.ansible_facts.getent_passwd[item][4] }}/.config/htop/htoprc"
+    create: true
+    regexp: "^detailed_cpu_time="
+    line: "detailed_cpu_time=1"
+    mode: 0600
+
+- name: "Set columns for user {{ item }}"
+  ansible.builtin.lineinfile:
+    dest: "{{ htop_user_info.ansible_facts.getent_passwd[item][4] }}/.config/htop/htoprc"
+    create: true
+    regexp: "^fields="
+    line: "fields=37 0 48 17 18 38 39 40 2 46 47 49 1"
+    mode: 0600
+
+- name: "Set sort key to CPU% for user {{ item }}"
+  ansible.builtin.lineinfile:
+    dest: "{{ htop_user_info.ansible_facts.getent_passwd[item][4] }}/.config/htop/htoprc"
+    create: true
+    regexp: "^sort_key="
+    line: "sort_key=46"
+    mode: 0600
+
+- name: "Set sort direction to high -> low for user {{ item }}"
+  ansible.builtin.lineinfile:
+    dest: "{{ htop_user_info.ansible_facts.getent_passwd[item][4] }}/.config/htop/htoprc"
+    create: true
+    regexp: "^sort_direction="
+    line: "sort_direction=-1"
+    mode: 0600

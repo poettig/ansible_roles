@@ -1,0 +1,167 @@
+{% macro filter_warnings() %}
+{% if backup_ignore_file_changed_warning_for_path_regexes %}
+			| rg -v 'WARNING -.*({{ backup_ignore_file_changed_warning_for_path_regexes | sort | join('|') }}).*file changed while we backed it up$' \
+{% endif %}
+{% if backup_ignore_no_such_file_or_directory_warning_for_path_regexes %}
+			| rg -v 'WARNING -.*({{ backup_ignore_no_such_file_or_directory_warning_for_path_regexes | sort | join('|') }}).*No such file or directory' \
+{% endif %}
+{% endmacro -%}
+
+{% set backup_paths = lookup('community.general.merge_variables', 'backup_paths', pattern_type='prefix') %}
+{% set backup_exclude_patterns = lookup('community.general.merge_variables', 'backup_exclude_patterns', pattern_type='prefix') %}
+{% set backup_borgbase_exclude_patterns = lookup('community.general.merge_variables', 'backup_borgbase_exclude_patterns', pattern_type='prefix') %}
+{% set backup_ignore_file_changed_warning_for_path_regexes = lookup('community.general.merge_variables', 'backup_ignore_file_changed_warning_for_path_regexes', pattern_type='prefix') %}
+{% set backup_ignore_no_such_file_or_directory_warning_for_path_regexes = lookup('community.general.merge_variables', 'backup_ignore_no_such_file_or_directory_warning_for_path_regexes', pattern_type='prefix') %}
+#!/usr/bin/env bash
+
+exitcode=0
+
+repos=(
+{% for target in backup_targets %}
+	"{{ target }}"
+{% endfor %}
+)
+
+export BORG_RSH="ssh -i /root/.ssh/backup_ed25519"
+export BORG_LOGGING_CONF=/root/.config/borg/logging.conf
+export BORG_RELOCATED_REPO_ACCESS_IS_OK=yes
+
+# some helpers and error handling:
+print_message() {
+	echo -e "$*" >&2;
+}
+
+notify() {
+	/usr/local/bin/notifier.py "Borg Notifier $(hostname -f)" "$*" peet
+}
+
+print_and_notify() {
+	print_message "$*"
+	notify "$*"
+}
+
+force=0
+while getopts ":f" arg; do
+	case "$arg" in
+		f)
+			force=1
+			;;
+		?)
+			echo "Invalid option $OPTARG"
+			exit 10
+			;;
+		*)
+			echo "Unexpected input $arg"
+			exit 11
+			;;
+	esac
+done
+{% if backup_pre_script is defined %}
+{{ backup_pre_script }}
+{% endif %}
+for repo in "${repos[@]}"; do
+	# Setting this, so the repo does not need to be given on the commandline:
+	export BORG_REPO="$repo"
+
+	# Setting this, so you won't be asked for your repository passphrase:
+	export BORG_PASSPHRASE='{{ backup_passphrase }}'
+
+	print_message "Starting backup"
+
+	# Backup the most important directories into an archive named after
+	# the machine this script is currently running on:
+
+	borg_create_args=(
+		--verbose
+		--filter AMEC
+		--list
+		--stats
+		--compression lz4
+		--exclude-caches
+{% for exclude in backup_exclude_patterns | sort %}
+		--exclude '{{ exclude }}'
+{% endfor %}
+	)
+
+{% if backup_borgbase_exclude_patterns is defined and backup_borgbase_exclude_patterns %}
+	if [[ "$repo" == *"borgbase.com"* ]]; then
+		borg_create_args+=(
+{% for exclude in backup_borgbase_exclude_patterns | sort %}
+			--exclude '{{ exclude }}'
+{% endfor %}
+		)
+	fi
+{% endif %}
+	borg_create_args+=(
+		::'{hostname}-{now}'
+{% for path in backup_paths | sort %}
+		'{{ path }}'
+{% endfor %}
+	)
+
+	exec 5>&1
+	borg_create_output="$({{ backup_executable_path }} create "${borg_create_args[@]}" 2>&1 | tee >(cat - >&5); exit ${PIPESTATUS[0]})"
+	create_exit=$?
+
+	message_prefix="Backup from '$(hostname -f)' to '$repo' finished with "
+	if [ ${create_exit} -eq 0 ]; then
+		print_message "Backup finished successfully"
+	elif [ ${create_exit} -eq 1 ]; then
+		warnings=$( \
+			echo "$borg_create_output" \
+			| rg 'WARNING -' \
+{{ filter_warnings() }}
+		)
+		if [ -n "$warnings" ]; then
+			print_message "$message_prefix warnings:\n$warnings"
+			notify "$message_prefix warnings:\n\`\`\`text\n$warnings\n\`\`\`"
+		fi
+	else
+		errors_and_warnings=$( \
+			echo "$borg_create_output" \
+			| rg '(WARNING|ERROR) -' \
+{{ filter_warnings() }}
+		)
+		print_message "$message_prefix errors:\n$errors_and_warnings"
+		notify "$message_prefix errors:\n\`\`\`text\n$errors_and_warnings\n\`\`\`"
+		exitcode=1
+	fi
+
+	print_message "Pruning repository"
+
+	# The '{hostname}-' prefix is very important to limit prune's operation
+	# to this machine's archives and not apply to other machines' archives also
+
+	borg_prune_args=(
+		--verbose
+		--list
+		--glob-archives '{hostname}-*'
+		--keep-daily	7
+		--keep-weekly   8
+		--keep-monthly  12
+	)
+
+	exec 6>&1
+	borg_prune_output="$({{ backup_executable_path }} prune "${borg_prune_args[@]}" 2>&1 | tee >(cat - >&6); exit ${PIPESTATUS[0]})"
+	prune_exit=$?
+
+	message_prefix="Prune of '$repo' finished with "
+	if [ ${prune_exit} -eq 0 ]; then
+		print_message "Prune finished successfully"
+	elif [ ${prune_exit} -eq 1 ]; then
+		warnings=$(echo "$borg_prune_output" | rg 'WARNING -')
+		print_message "$message_prefix warnings:\n$warnings"
+		notify "$message_prefix warnings:\n\`\`\`text\n$warnings\n\`\`\`"
+	else
+		errors_and_warnings=$(echo "$borg_prune_output" | rg '(WARNING|ERROR) -')
+		print_message "$message_prefix errors:\n$errors_and_warnings"
+		notify "$message_prefix errors:\n\`\`\`text\n$errors_and_warnings\n\`\`\`"
+		exitcode=1
+	fi
+done
+
+{% if backup_post_script is defined %}
+{{ backup_post_script }}
+{% endif %}
+
+exit "$exitcode"

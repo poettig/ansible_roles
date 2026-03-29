@@ -1,22 +1,22 @@
 ---
 
-- name: Load OS dependent variables
-  include_vars:
-    file: "{{ ansible_distribution | lower }}.yml"
+- name: "Load OS dependent variables"
+  ansible.builtin.include_vars:
+    file: "{{ ansible_facts['distribution'] | lower }}.yml"
 
-- name: Install python virtualenv
-  package:
+- name: "Install python virtualenv"
+  ansible.builtin.package:
     name:
       - "{{ python_venv_virtualenv_package_name }}"
       - "{{ python_venv_packaging_package_name }}"
 
-- name: Check if venv directory exists
-  stat:
+- name: "Check if venv directory exists"
+  ansible.builtin.stat:
     path: "{{ python_venv_directory }}"
   register: python_venv_directory_stat
 
-- name: Check if python executable exists
-  stat:
+- name: "Check if python executable exists"
+  ansible.builtin.stat:
     path: "{{ python_venv_directory }}/bin/python"
     # The python executable in a venv is a symlink, follow it
     follow: true
@@ -25,8 +25,8 @@
     - python_venv_directory_stat.stat.exists
     - python_venv_directory_stat.stat.isdir
 
-- name: Check if pip in the venv still works
-  command:
+- name: "Check if pip in the venv still works"
+  ansible.builtin.command:
     cmd: "{{ python_venv_directory }}/bin/pip list"
   check_mode: false
   changed_when: false
@@ -37,16 +37,16 @@
     - python_venv_directory_stat.stat.isdir
 
 # As the python executable in a venv is a symlink to /usr/bin/pythonX.XX, it will break if the system python is upgraded
-- name: Remove old venv if it is invalid
-  file:
+- name: "Remove old venv if it is invalid"
+  ansible.builtin.file:
     path: "{{ python_venv_directory }}"
     state: absent
   when:
     - python_venv_directory_stat.stat.exists
     - not (python_venv_python_stat.stat.exists and python_venv_python_stat.stat.executable) or python_venv_pip_result.rc != 0
 
-- name: Install requirements from package list
-  pip:
+- name: "Install requirements from package list"
+  ansible.builtin.pip:
     virtualenv: "{{ python_venv_directory }}"
     name: "{{ python_venv_modules }}"
   notify: "{{ python_venv_handlers_to_notify }}"
@@ -54,8 +54,8 @@
     - python_venv_modules is defined
     - not ansible_check_mode
 
-- name: Install requirements from requirements file
-  pip:
+- name: "Install requirements from requirements file"
+  ansible.builtin.pip:
     virtualenv: "{{ python_venv_directory }}"
     requirements: "{{ python_venv_requirements_file }}"
   notify: "{{ python_venv_handlers_to_notify }}"

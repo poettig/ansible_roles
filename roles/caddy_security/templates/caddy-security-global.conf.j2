@@ -1,0 +1,104 @@
+order authenticate before respond
+order authorize before basicauth
+
+security {
+{% if caddy_security_static_users is defined %}
+    local identity store staticusers {
+        realm local
+        path /etc/caddy/caddy_security_users.json
+{% for user in caddy_security_static_users %}
+        user {{ user.name }} {
+            name {{ user.name }}
+            email caddy@localhost
+            password "bcrypt:12:{{ user.password | ansible.builtin.password_hash(hashtype='bcrypt', rounds=12, salt=(((2**128) | random(seed=inventory_hostname) | string)[:22])) }}"
+            roles {{ user.roles | join(" ") }}
+        }
+{% endfor %}
+    }
+{% endif %}
+{% if caddy_security_identity_provider_google_client_id is defined %}
+    oauth identity provider google {
+        realm google
+        driver google
+        client_id {{ caddy_security_identity_provider_google_client_id }}
+        client_secret {{ caddy_security_identity_provider_google_client_secret }}
+        scopes openid email
+    }
+
+{% endif %}
+{% if caddy_security_authentication_portals is defined %}
+{% for authentication_portal in caddy_security_authentication_portals %}
+    authentication portal {{ authentication_portal.name }} {
+        crypto default token lifetime {{ authentication_portal.token_lifetime }}
+        crypto key sign-verify {{ caddy_security_jwt_key }}
+        enable identity provider {{ authentication_portal.identity_provider }}
+{% if "enable_static_users" in authentication_portal and authentication_portal.enable_static_users %}
+        enable identity store staticusers
+{% endif %}
+        cookie domain {{ authentication_portal.cookie_domain }}
+        cookie samesite lax
+
+        ui {
+{% if "ui_logo_url" in authentication_portal %}
+            logo url {{ authentication_portal.ui_logo_url }}
+{% endif %}
+{% if "ui_logo_description" in authentication_portal %}
+            logo description "{{ authentication_portal.ui_logo_description }}"
+{% endif %}
+            meta title "{{ authentication_portal.ui_title }}"
+{% if "ui_links" in authentication_portal %}
+            links {
+{% for link in authentication_portal.ui_links %}
+                "{{ link.title }}" "{{ link.target }}" icon "{{ link.icon }}"
+{% endfor %}
+            }
+{% endif %}
+        }
+
+{% for user_transform in authentication_portal.user_transforms %}
+        transform user {
+{% for matcher in user_transform.matchers %}
+            {% if "regex" in matcher and matcher.regex %}regex {% endif %}match {{ matcher.type }} "{{ matcher.value }}"
+{% endfor %}
+{% if "actions" in user_transform %}
+            action add role authp/user
+{% for action in user_transform.actions %}
+{% if action.value is iterable and (action.value is not string and action.value is not mapping) %}
+{% for value in action.value %}
+            action {{ action.operation }} {{ action.type }} {{ value }}
+{% endfor %}
+{% else %}
+            action {{ action.operation }} {{ action.type }} {{ action.value }}
+{% endif %}
+{% endfor %}
+{% for action in user_transform.actions %}
+{% for role, links in caddy_security_role_to_ui_links.items() %}
+{% if action.operation == "add" and action.type == "role" and (role == action.value or (action.value is iterable and role in action.value)) %}
+{% for link in links %}
+            ui link "{{ link.title }}" "{{ link.target }}" icon "{{ link.icon }}"
+{% endfor %}
+{% endif %}
+{% endfor %}
+{% endfor %}
+{% endif %}
+        }
+{% endfor %}
+    }
+
+{% endfor %}
+{% endif %}
+{% if caddy_security_authorization_policies is defined %}
+{% for authorization_policy in caddy_security_authorization_policies %}
+    authorization policy {{ authorization_policy.name }} {
+        set auth url {{ authorization_policy.url }}
+        crypto key verify {{ caddy_security_jwt_key }}
+{% if authorization_policy.allowed_roles is defined %}
+        allow roles {{ authorization_policy.allowed_roles + [authorization_policy.name] | join(" ") }}
+{% else %}
+        allow roles {{ authorization_policy.name }}
+{% endif %}
+    }
+
+{% endfor %}
+{% endif %}
+}

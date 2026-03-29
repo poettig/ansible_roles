@@ -1,138 +1,153 @@
 ---
 
-- name: Install updater dependencies
-  package:
+- name: "Install updater dependencies"
+  ansible.builtin.package:
     name:
       - jq
 
-- name: Create user caddy
+- name: "Create user caddy"
   ansible.builtin.user:
-    name: caddy
-    shell: /usr/bin/nologin
+    name: "{{ caddy_user_name }}"
+    shell: "/usr/bin/nologin"
+  register: caddy_user_info
 
-- name: Create the directory for necessary executables
-  file:
+- name: "Prepare executables directory variable"
+  ansible.builtin.set_fact:
+    caddy_executables_directory: "{{ caddy_user_info.home }}/.local/bin"
+
+- name: "Create the directory for necessary executables"
+  ansible.builtin.file:
     path: "{{ caddy_executables_directory }}"
     state: directory
+    owner: "{{ caddy_user_info.uid }}"
+    group: "{{ caddy_user_info.group }}"
     mode: 0755
-    owner: caddy
-    group: caddy
 
-- name: Install caddy config generator
-  copy:
-    src: generate_caddy_config.sh
+- name: "Install caddy config generator"
+  ansible.builtin.copy:
+    src: "generate_caddy_config.sh"
     dest: "{{ caddy_executables_directory }}/generate_caddy_config.sh"
-    owner: caddy
-    group: caddy
+    owner: "{{ caddy_user_info.uid }}"
+    group: "{{ caddy_user_info.group }}"
     mode: 0700
 
-- name: Install caddy service
-  template:
-    src: caddy.service.j2
-    dest: /etc/systemd/system/caddy.service
-    owner: root
-    group: root
+- name: "Install caddy service"
+  ansible.builtin.template:
+    src: "caddy.service.j2"
+    dest: "/etc/systemd/system/caddy.service"
     mode: 0644
-  notify: Restart caddy
+  notify: "Restart caddy"
 
-- name: Deploy caddy updater script
-  template:
-    src: update_caddy.sh.j2
+- name: "Deploy caddy updater script"
+  ansible.builtin.template:
+    src: "update_caddy.sh.j2"
     dest: "{{ caddy_executables_directory }}/update_caddy.sh"
-    owner: caddy
-    group: caddy
+    owner: "{{ caddy_user_info.uid }}"
+    group: "{{ caddy_user_info.group }}"
     mode: 0700
 
-- name: Allow user caddy to restart caddy
+- name: "Allow user caddy to restart caddy"
   community.general.sudoers:
-    name: allow-restart-caddy
+    name: "allow-restart-caddy"
     state: present
-    user: caddy
-    commands: /bin/systemctl restart caddy
+    user: "{{ caddy_user_info.name }}"
+    commands: "/bin/systemctl restart caddy"
 
-- name: Install caddy via updater
-  become: yes
-  become_user: caddy
+- name: "Install caddy via updater"
+  become: true
+  become_user: "{{ caddy_user_info.name }}"
   ansible.builtin.command:
     cmd: "{{ caddy_executables_directory }}/update_caddy.sh{% if caddy_updater_force_rebuild %} -f{% endif %}"
     creates: "{% if caddy_updater_force_rebuild %}/this_does_never_exist{% else %}{{ caddy_executables_directory }}/caddy{% endif %}"
   ignore_errors: "{{ ansible_check_mode }}"
   # No notify, the updater script restarts the service itself
 
-- name: Install caddy updater service
-  template:
-    src: caddy-updater.service.j2
-    dest: /etc/systemd/system/caddy-updater.service
+- name: "Install caddy updater service"
+  ansible.builtin.template:
+    src: "caddy-updater.service.j2"
+    dest: "/etc/systemd/system/caddy-updater.service"
+    mode: 0644
 
-- name: Install caddy updater timer
-  template:
-    src: caddy-updater.timer.j2
-    dest: /etc/systemd/system/caddy-updater.timer
+- name: "Install caddy updater timer"
+  ansible.builtin.template:
+    src: "caddy-updater.timer.j2"
+    dest: "/etc/systemd/system/caddy-updater.timer"
+    mode: 0644
 
-- name: Create caddy config directory
-  file:
-    path: /etc/caddy
-    owner: caddy
-    group: caddy
-    mode: 0700
+- name: "Create caddy config directory"
+  ansible.builtin.file:
+    path: "/etc/caddy"
     state: directory
-  notify: Reload caddy
+    owner: "{{ caddy_user_info.uid }}"
+    group: "{{ caddy_user_info.group }}"
+    mode: 0700
+  notify: "Reload caddy"
 
-- name: Install caddy main config
-  copy:
-    src: Caddyfile
-    dest: /etc/caddy/Caddyfile
-    owner: caddy
-    group: caddy
+- name: "Install caddy main config"
+  ansible.builtin.copy:
+    src: "Caddyfile"
+    dest: "/etc/caddy/Caddyfile"
+    owner: "{{ caddy_user_info.uid }}"
+    group: "{{ caddy_user_info.group }}"
     mode: 0600
-  notify: Reload caddy
+  notify: "Reload caddy"
 
-- name: Create a webroot if requested
-  file:
+- name: "Create a webroot if requested"
+  ansible.builtin.file:
     path: "{{ caddy_webroot }}"
     state: directory
-    owner: caddy
-    group: caddy
+    owner: "{{ caddy_user_info.uid }}"
+    group: "{{ caddy_user_info.group }}"
     mode: 0755
   when: caddy_webroot is defined
 
-- name: Enable caddy
+- name: "Enable caddy"
   ansible.builtin.systemd_service:
-    name: caddy
+    name: "caddy"
     enabled: true
     daemon_reload: true
   ignore_errors: "{{ ansible_check_mode }}"
 
-- name: Enable caddy updater
+- name: "Enable caddy updater"
   ansible.builtin.systemd_service:
-    name: caddy-updater
-    enabled: yes
+    name: "caddy-updater"
+    enabled: true
   ignore_errors: "{{ ansible_check_mode }}"
 
-- name: Enable caddy updater timer
+- name: "Enable caddy updater timer"
   ansible.builtin.systemd_service:
-    name: caddy-updater.timer
-    enabled: yes
+    name: "caddy-updater.timer"
+    enabled: true
   ignore_errors: "{{ ansible_check_mode }}"
 
-- name: Install global directive files provided by caller
-  include_tasks: add_global_directive_config.yml
+- name: "Install base site config for the host"
+  ansible.builtin.include_tasks: add_site_config.yml
+  vars:
+    caddy_site_config:
+      template: "base.conf.j2"
+      target_filename: "{{ inventory_hostname }}.conf"
+
+# The `default([], true)` is important in the following because otherwise, if no variable is available for merge, null is used for the loop instead of an empty list
+# The "true" parameter enables defaulting for falsy or empty variables, not only for undefined variables: https://docs.ansible.com/projects/ansible/latest/playbook_guide/playbooks_filters.html#providing-default-values
+
+- name: "Install global directive files provided by caller"
+  ansible.builtin.include_tasks: add_global_directive_config.yml
   loop: "{{ lookup('community.general.merge_variables', 'caddy_global_directive_configs', pattern_type='prefix') | default([], true) }}"
   loop_control:
     loop_var: caddy_global_directive_config
     label: "{{ caddy_global_directive_config.template }}"
   when: lookup('ansible.builtin.varnames', 'caddy_global_directive_configs') | length > 0
 
-- name: Install caddy site configs provided by caller
-  include_tasks: add_site_config.yml
+- name: "Install caddy site configs provided by caller"
+  ansible.builtin.include_tasks: add_site_config.yml
   loop: "{{ lookup('community.general.merge_variables', 'caddy_site_configs', pattern_type='prefix') | default([], true) }}"
   loop_control:
     loop_var: caddy_site_config
     label: "{{ caddy_site_config.template }}"
   when: lookup('ansible.builtin.varnames', 'caddy_site_configs') | length > 0
 
-- name: Install caddy subconfigs provided by caller
-  include_tasks: add_generic_subconfig.yml
+- name: "Install caddy subconfigs provided by caller"
+  ansible.builtin.include_tasks: add_generic_subconfig.yml
   loop: "{{ lookup('community.general.merge_variables', 'caddy_subconfigs', pattern_type='prefix') | default([], true) }}"
   loop_control:
     loop_var: caddy_generic_subconfig

@@ -1,0 +1,8 @@
+---
+
+- name: "Set up all provided webcontent sites"
+  ansible.builtin.include_tasks: set_up_site.yml
+  loop: "{{ ci_managed_webcontent_sites }}"
+  loop_control:
+    loop_var: "ci_managed_webcontent_site"
+    label: "{{ ci_managed_webcontent_site.fqdn }}"

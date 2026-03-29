@@ -1,0 +1,14 @@
+---
+
+python_service_script_path: "/var/lib/{{ python_service_name }}/{{ python_service_name }}.py"
+python_service_systemd_unit_options_default:
+  Wants: "network-online.target"
+  After: "network.target network-online.target"
+python_service_systemd_service_environment_default:
+  PYTHONUNBUFFERED: 1
+python_service_handlers_to_notify_restart_service:
+  - "Restart {{ python_service_name }}"
+python_service_systemd_enable: true
+python_service_systemd_notify:
+  success: false
+  failed: false

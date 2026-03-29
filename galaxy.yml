@@ -8,7 +8,7 @@ namespace: poettig
 name: roles
 
 # The version of the collection. Must be compatible with semantic versioning
-version: 1.3.3
+version: 1.4.0
 
 # The path to the Markdown (.md) readme file. This path is relative to the root of the collection
 readme: README.md
@@ -22,7 +22,7 @@ authors:
 # A short summary description of the collection
 description: Collection of roles used by me and available to anyone.
 
-# Either a single license or a list of licenses for content inside of a collection. Ansible Galaxy currently only
+# Either a single license or a list of licenses for content inside a collection. Ansible Galaxy currently only
 # accepts L(SPDX,https://spdx.org/licenses/) licenses. This key is mutually exclusive with 'license_file'
 license:
   - MIT
@@ -35,7 +35,10 @@ tags: []
 # collection label 'namespace.name'. The value is a version range
 # L(specifiers,https://python-semanticversion.readthedocs.io/en/latest/#requirement-specification). Multiple version
 # range specifiers can be set and are separated by ','
-dependencies: {}
+dependencies:
+  ansible.posix: ">=2.1.0"
+  community.general: ">=12.3.0"
+  kewlfft.aur: ">=0.13.0"
 
 # The URL of the originating SCM repository
 repository: https://github.com/poettig/ansible_roles

@@ -1,0 +1,7 @@
+---
+
+node_exporter_args:
+  - "--collector.filesystem.ignored-mount-points='^/(dev|proc|run|sys|media|var/lib/docker/.+)($|/)'"
+  - "--web.listen-address='localhost:9100'"
+  - "--collector.processes"
+  - "--collector.interrupts"

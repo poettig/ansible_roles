@@ -1,11 +1,11 @@
 ---
 
-- name: Ensure that git urls contain an explicit name
-  fail:
+- name: "Assert that git urls contain an explicit name"
+  ansible.builtin.assert:
+    that: pipx_install_package is regex("^[A-Za-z0-9-_]+\s+@\s+git\+.*$")
     msg: "Please make sure that '{{ pipx_install_package }}' is prefixed py the package name, i.e. '<package name> @ {{ pipx_install_package }}'. The spaces are important."
-  when:
-    - "'git+' in pipx_install_package"
-    - pipx_install_package is not regex("^[A-Za-z0-9-_]+\s+@\s+git\+.*$")
+  when: "'git+' in pipx_install_package"
+
 
 - name: "Install pipx package {{ pipx_install_package }}"
   become: true
@@ -14,14 +14,14 @@
     name: "{{ pipx_install_package }}"
   ignore_errors: "{{ ansible_check_mode }}"
 
-- name: Generate necessary alternative python package names
-  set_fact:
-    pipx_install_package_name_for_service: "{{ pipx_install_package | regex_replace('\\[', '-') | regex_replace('\\]$', '') | regex_replace('\\s+@\\s+git\\+.*$', '')}}"
+- name: "Generate necessary alternative python package names"
+  ansible.builtin.set_fact:
+    pipx_install_package_name_for_service: "{{ pipx_install_package | regex_replace('\\[', '-') | regex_replace('\\]$', '') | regex_replace('\\s+@\\s+git\\+.*$', '') }}"
     pipx_install_package_name_only: "{{ pipx_install_package | regex_replace('\\[.*?\\]$', '') | regex_replace('\\s+@\\s+git\\+.*$', '') }}"
 
-- name: "Create auto updater entry for package {{ pipx_install_package }} under user {{ pipx_install_user }}"
-  include_role:
-    name: systemd
+- name: "Create auto updater entry for package"
+  ansible.builtin.include_role:
+    name: "poettig.roles.systemd"
   vars:
     systemd_name: "pipx-upgrade-{{ pipx_install_package_name_for_service }}-{{ pipx_install_user }}"
     systemd_service_description: "Regularly upgrade {{ pipx_install_package }} via pipx"

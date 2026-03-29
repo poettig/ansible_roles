@@ -1,0 +1,33 @@
+---
+
+- name: "Ensure that at least one server ist configured"
+  ansible.builtin.assert:
+    that: query('ansible.builtin.varnames', 'ntpdrs_nt[sp]_servers_.+') | length > 0
+    fail_msg: "No ntp or nts servers given, can't continue. Please set at least one variable with prefix ntpdrs_ntp_servers_ or ntpdrs_nts_servers_."
+
+- name: "Install ntpd-rs"
+  ansible.builtin.package:
+    name: "ntpd-rs"
+
+- name: "Install ntp.toml configuration file"
+  ansible.builtin.template:
+    src: "ntp.toml.j2"
+    dest: "/etc/ntpd-rs/ntp.toml"
+    mode: 0644
+    validate: "ntp-ctl validate -c %s"
+  notify: "Restart ntpd-rs"
+
+- name: "Ensure that ntpd-rs is enabled and started"
+  ansible.builtin.systemd_service:
+    name: "ntpd-rs"
+    state: "started"
+    enabled: true
+    daemon_reload: true
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: "Ensure that systemd-timesyncd is disabled"
+  ansible.builtin.systemd_service:
+    name: "systemd-timesyncd"
+    state: stopped
+    enabled: false
+    masked: true

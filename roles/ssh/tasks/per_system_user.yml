@@ -1,0 +1,19 @@
+---
+
+- name: "Discover user home for {{ ssh_system_user.user }}"
+  ansible.builtin.user:
+    name: "{{ ssh_system_user.user }}"
+  register: ssh_system_user_info
+
+- name: "Create .ssh directory for {{ ssh_system_user.user }}"
+  ansible.builtin.file:
+    path: "{{ ssh_system_user_info.home }}/.ssh"
+    owner: "{{ ssh_system_user.user }}"
+    group: "{{ ssh_system_user.user }}"
+    mode: 0700
+
+- name: "Create authorized_keys entries allowing access for each user"
+  ansible.builtin.include_tasks: per_allowed_user.yml
+  loop: "{{ ssh_system_user.keys_from }}"
+  loop_control:
+    loop_var: ssh_key_owner

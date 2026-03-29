@@ -1,0 +1,9 @@
+---
+
+systemd_base_directory: "/etc/systemd/system"
+systemd_script_owner: "root"
+systemd_script_group: "root"
+systemd_script_mode: 0700
+systemd_service_restart: true
+systemd_service_enable: false
+systemd_service_can_be_enabled: false

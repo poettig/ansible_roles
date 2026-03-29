@@ -1,28 +1,34 @@
 ---
 
+- name: "Get caddy user info"
+  ansible.builtin.user:
+    name: "{{ caddy_user_name }}"
+    shell: "/usr/bin/nologin"
+  register: caddy_user_info
+
 - name: "Create caddy subconfig directory /etc/caddy/{{ caddy_generic_subconfig.directory }}"
-  file:
+  ansible.builtin.file:
     path: "/etc/caddy/{{ caddy_generic_subconfig.directory }}"
-    owner: caddy
-    group: caddy
-    mode: 0700
     state: directory
-  notify: Reload caddy
+    owner: "{{ caddy_user_info.uid }}"
+    group: "{{ caddy_user_info.group }}"
+    mode: "0700"
+  notify: "Reload caddy"
 
 - name: "Prepare target filename for {{ caddy_generic_subconfig.template }}"
-  set_fact:
-    caddy_generic_subconfig_target_filename: >-
+  ansible.builtin.set_fact:
+    caddy_generic_subconfig_target_filename: |-
       {% if caddy_generic_subconfig.target_filename is defined %}
-        {{- caddy_generic_subconfig.target_filename | regex_replace('\.(j2|jinja2?)$', '') -}}
+      {{- caddy_generic_subconfig.target_filename | regex_replace('\.(j2|jinja2?)$', '') -}}
       {% else %}
-        {{- caddy_generic_subconfig.template | basename | regex_replace('\.(j2|jinja2?)$', '') -}}
+      {{- caddy_generic_subconfig.template | basename | regex_replace('\.(j2|jinja2?)$', '') -}}
       {% endif %}
 
-- name: "Install caddy subconfig {{ caddy_generic_subconfig.template }} to /etc/caddy/{{ caddy_generic_subconfig.directory }}/{{ caddy_generic_subconfig_target_filename }}"
-  template:
+- name: "Install caddy subconfig {{ caddy_generic_subconfig.template }} to /etc/caddy/{{ caddy_generic_subconfig.directory }}/{{ caddy_generic_subconfig_target_filename }}"  # noqa: name[template] - The templated variables are important for readability
+  ansible.builtin.template:
     src: "{{ caddy_generic_subconfig.template }}"
     dest: "/etc/caddy/{{ caddy_generic_subconfig.directory }}/{{ caddy_generic_subconfig_target_filename }}"
-    owner: caddy
-    group: caddy
-    mode: 0600
-  notify: Reload caddy
+    owner: "{{ caddy_user_info.uid }}"
+    group: "{{ caddy_user_info.group }}"
+    mode: "0600"
+  notify: "Reload caddy"

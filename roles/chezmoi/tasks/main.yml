@@ -1,0 +1,8 @@
+---
+
+- name: "Run OS dependent tasks"
+  ansible.builtin.include_tasks: "{{ ansible_facts['distribution'] | lower }}.yml"
+
+- name: "Configure chezmoi for each user"
+  ansible.builtin.include_tasks: user.yml
+  loop: "{{ chezmoi_users }}"

@@ -1,0 +1,58 @@
+---
+
+- name: "Create vaultwarden user"
+  ansible.builtin.user:
+    name: "vaultwarden"
+    create_home: true
+  register: vaultwarden_user_info
+
+- name: "Create vaultwarden data directory"
+  ansible.builtin.file:
+    path: "{{ vaultwarden_user_info.home }}/data"
+    state: directory
+    owner: "{{ vaultwarden_user_info.uid }}"
+    group: "{{ vaultwarden_user_info.group }}"
+    mode: 0755
+
+- name: "Setup vaultwarden podman service"
+  ansible.builtin.include_role:
+    name: "common"
+    tasks_from: podman-service.yml
+  vars:
+    common_podman_service:
+      name: "vaultwarden"
+      user: "vaultwarden"
+      pull_images:
+        - name: "vaultwarden"
+          image: "docker.io/vaultwarden/server"
+          environment_file_path: "{{ vaultwarden_user_info.home }}/.env"
+          environment:
+            ROCKET_PORT: 8080
+            ADMIN_TOKEN: "{{ vaultwarden_admin_token | domrim.general.password_hash_argon2(salt=((2**128) | random(seed=inventory_hostname) | string), time_cost=3, parallelism=4, memory_cost=65540) }}"
+            SIGNUPS_ALLOWED: false
+            DOMAIN: "https://{{ vaultwarden_fqdn }}"
+            PUSH_ENABLED: true
+            PUSH_INSTALLATION_ID: "{{ vaultwarden_push_installation_id }}"
+            PUSH_INSTALLATION_KEY: "{{ vaultwarden_push_installation_key }}"
+            PUSH_RELAY_URI: "https://api.bitwarden.eu"
+            PUSH_IDENTITY_URI: "https://identity.bitwarden.eu"
+            TRASH_AUTO_DELETE_DAYS: 30
+            SMTP_HOST: "{{ vaultwarden_smtp_host }}"
+            SMTP_FROM: "{{ vaultwarden_smtp_from }}"
+            SMTP_FROM_NAME: "{{ vaultwarden_smtp_from_name }}"
+            SMTP_USERNAME: "{{ vaultwarden_smtp_username }}"
+            SMTP_PASSWORD: "{{ vaultwarden_smtp_password }}"
+            SMTP_SECURITY: "{{ vaultwarden_smtp_security }}"
+          volumes:
+            - "{{ vaultwarden_user_info.home }}/data:/data:Z"
+          publish:
+            - "127.0.0.1:7843:8080"
+          enable: true
+
+- name: "Add bitwarden site config to caddy"
+  ansible.builtin.include_role:
+    name: "poettig.roles.caddy"
+    tasks_from: add_site_config.yml
+  vars:
+    caddy_site_config:
+      template: "vaultwarden.conf.j2"

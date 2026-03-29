@@ -1,25 +1,25 @@
 ---
 
-- name: Load OS dependent variables
+- name: "Load OS dependent variables"
   ansible.builtin.include_vars:
-    file: "{{ ansible_distribution | lower }}.yml"
+    file: "{{ ansible_facts['distribution'] | lower }}.yml"
   failed_when: false  # never fail, even if the file does not exist
 
-- name: Ensure that packages to install is a list
-  ansible.builtin.fail:
+- name: "Assert that packages to install is a list"
+  ansible.builtin.assert:
+    that: pipx_install_packages | type_debug == "list"
     msg: "Sorry, due to shitty ansible variable precedence, the packages to install always have to be a list, even if there is only one entry."
-  when: pipx_install_packages | type_debug != "list"
 
-- name: Install pipx
+- name: "Install pipx"
   ansible.builtin.package:
     name: "{{ pipx_install_dependencies }}"
 
-- name: Get information about user
+- name: "Get information about user"
   ansible.builtin.user:
     name: "{{ pipx_install_user }}"
   register: pipx_install_user_info
 
-- name: Add $HOME/.local/bin to PATH
+- name: "Add $HOME/.local/bin to PATH"
   ansible.builtin.lineinfile:
     path: "{{ pipx_install_user_info.home }}/.bashrc"
     insertbefore: "BOF"

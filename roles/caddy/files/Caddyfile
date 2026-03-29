@@ -1,7 +1,7 @@
 {
 	admin
-	servers {
-		metrics
+	metrics {
+		per_host
 	}
 
 	import /etc/caddy/global.d/*.conf

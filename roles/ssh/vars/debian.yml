@@ -1,0 +1,4 @@
+---
+
+ssh_package_name: "openssh-server"
+ssh_service_name: "ssh"

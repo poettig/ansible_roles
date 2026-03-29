@@ -1,0 +1,5 @@
+---
+
+podman_package_dependencies:
+  - podman
+  - fuse-overlayfs

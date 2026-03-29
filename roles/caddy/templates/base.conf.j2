@@ -1,0 +1,44 @@
+{% if caddy_prometheus_caddy_metrics_basicauth is defined or caddy_prometheus_system_metrics_basicauth is defined %}
+(metrics) {
+    route /{args[0]}/metrics {
+        uri strip_prefix /{args[0]}
+
+        basic_auth {
+            {args[0]}_metrics {args[1]}
+        }
+
+        reverse_proxy localhost:{args[2]} {
+            # Only necessary for caddy metrics, but doesn't hurt either
+            header_up -Host
+        }
+    }
+}
+
+{% endif %}
+{{ inventory_hostname }} {
+    log {
+        output file /var/log/caddy/{{ inventory_hostname.split(".")[0:-2] | join(".") }}.log
+    }
+
+    header {
+        Strict-Transport-Security "max-age=31536000; preload; includeSubdomains"
+        X-XSS-Protection "1; mode=block"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "same-origin"
+    }
+
+{% if caddy_prometheus_caddy_metrics_basicauth is defined %}
+    import metrics caddy {{ caddy_prometheus_caddy_metrics_basicauth }} 2019
+{% endif %}
+{% if caddy_prometheus_system_metrics_basicauth is defined %}
+    import metrics system {{ caddy_prometheus_system_metrics_basicauth }} 9100
+{% endif %}
+    import {{ inventory_hostname }}-directives.d/*.conf
+
+    # Everything else gets a "go away" message
+    respond 404 {
+        body "Nothing to see here."
+        close
+    }
+}

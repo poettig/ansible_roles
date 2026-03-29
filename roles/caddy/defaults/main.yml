@@ -1,6 +1,6 @@
 ---
 
-caddy_executables_directory: /home/caddy/.local/bin
+caddy_user_name: "caddy"
 caddy_updater_oncalendar: "*-*-* 05:00"
 caddy_updater_randomizeddelaysec: "3600"
 caddy_updater_force_rebuild: false

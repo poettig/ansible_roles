@@ -1,0 +1,20 @@
+---
+
+repos:
+  - repo: https://github.com/ansible-community/ansible-lint.git
+    rev: v26.1.1
+    hooks:
+      - id: ansible-lint
+        files: \.(yaml|yml)$
+        additional_dependencies:
+          - ansible
+        language_version: python3.14
+
+  - repo: local
+    hooks:
+      - id: ansible-vault
+        name: Ansible Vault Checker
+        description: Checks if vault files are encrypted
+        entry: "bash -c 'ansible-vault view $@ > /dev/null' --"
+        language: unsupported
+        files: (files_vault/|vault.yml)

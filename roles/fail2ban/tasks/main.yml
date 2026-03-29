@@ -1,0 +1,30 @@
+---
+
+- name: "Load OS dependent variables"
+  ansible.builtin.include_vars:
+    file: "{{ ansible_facts['distribution'] | lower }}.yml"
+  failed_when: false  # never fail, even if the file does not exist
+
+- name: "Install fail2ban"
+  ansible.builtin.package:
+    name: "{{ fail2ban_package_names }}"
+  notify: "Restart fail2ban"
+
+- name: "Install fail2ban jail.local"
+  ansible.builtin.copy:
+    dest: "/etc/fail2ban/jail.local"
+    mode: 0644
+    content: |
+      [DEFAULT]
+      banaction = nftables[type=allports]
+      
+      [sshd]
+      enabled = true
+      backend = systemd
+      mode = aggressive
+      maxretry = 3
+      findtime = 1h
+      banTime = 10m
+      banTime.increment = true
+      banTime.factor = 1
+  notify: "Restart fail2ban"

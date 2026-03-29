@@ -1,0 +1,82 @@
+---
+
+- name: "Check if notifier is installed"
+  ignore_errors: "{{ ansible_check_mode }}"
+  block:
+    - name: "Get stat of notifier.py"
+      ansible.builtin.stat:
+        path: "/usr/local/bin/notifier.py"
+      register: backup_notifier_stat
+
+    - name: "Assert that notifier.py exists"
+      ansible.builtin.assert:
+        that: backup_notifier_stat.stat.exists
+        msg: "/usr/local/bin/notifier.py does not exist, cannot proceed."
+
+- name: "Install borg"
+  ansible.builtin.include_tasks: install_borg.yml
+  vars:
+    backup_borg_install_user: "{{ item }}"
+  loop: "{{ backup_install_for_additional_users + ['root'] }}"
+
+- name: "Initialize backup_targets with manually created backup targets"
+  ansible.builtin.set_fact:
+    backup_targets: "{{ backup_additional_targets }}"
+
+- name: "Add automatically created backup targets to backup_targets"
+  ansible.builtin.set_fact:
+    backup_targets: "{{ (backup_targets | default([])) + ['ssh://backup@' + item + hostvars[item].backup_repos_homedir + '/' + inventory_hostname] }}"
+  when:
+    - item in hostvars
+    - "'backup_client_hosts' in hostvars[item]"
+    - inventory_hostname in hostvars[item].backup_client_hosts
+  loop: "{{ groups['backup_target'] }}"
+
+- name: "Check if all backup targets exist"
+  ansible.builtin.include_tasks: ensure_repo_existence.yml
+  loop: "{{ backup_targets }}"
+
+- name: "Setup systemd unit triggered backup"
+  when: backup_time is not defined
+  block:
+    - name: "Deploy backup script"
+      ansible.builtin.template:
+        src: "{{ backup_script_template_name }}"
+        dest: "{{ backup_script_target_file_path }}"
+        mode: 0755
+
+    - name: "Install systemd service unit"
+      ansible.builtin.copy:
+        src: "{{ inventory_hostname }}/backup.service"
+        dest: "/etc/systemd/system/backup.service"
+        mode: 0644
+
+    - name: "Enable backup systemd service unit"
+      ansible.builtin.systemd_service:
+        name: "backup.service"
+        enabled: true
+        daemon_reload: true
+
+- name: "Setup timed systemd backup job"
+  ansible.builtin.include_role:
+    name: "poettig.roles.systemd"
+  vars:
+    systemd_name: "backup"
+    systemd_script_template_name: "{{ backup_script_template_name }}"
+    systemd_script_destination: "{{ backup_script_target_file_path }}"
+    systemd_unit_options:
+      Wants: "network-online.target"
+      After: "network.target network-online.target"
+    systemd_service_description: "Backup data via borg"
+    systemd_timer_description: "Run {{ systemd_name }} every day at {{ backup_time }}"
+    systemd_timer_options:
+      OnCalendar: "*-*-* {{ backup_time }}:00"
+      Persistent: true
+  when: backup_time is defined
+
+- name: "Install borg_compact.sh if requested"
+  ansible.builtin.copy:
+    src: "borg_compact.sh"
+    dest: "/usr/local/bin/borg-compact"
+    mode: 0700
+  when: backup_install_borg_compact

@@ -1,0 +1,7 @@
+---
+
+- name: "Install chezmoi"
+  ansible.builtin.package:
+    name:
+      - chezmoi
+      - age

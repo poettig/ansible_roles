@@ -1,0 +1,51 @@
+---
+
+- name: "Create ssh key for backup on backup client {{ item }}"
+  delegate_to: "{{ item }}"
+  community.crypto.openssh_keypair:
+    path: "/root/.ssh/backup_ed25519"
+    type: "ed25519"
+  register: backup_keypair_info
+  ignore_unreachable: true  # Don't fail the whole playbook just because a backup client host is not reachable
+
+- name: "Ask for deploy of ssh key to borgbase if a new ssh key was generated"
+  when:
+    - backup_keypair_info is defined
+    - backup_keypair_info.changed
+  block:
+    - name: "Print ssh pubkey"
+      ansible.builtin.debug:
+        msg: "{{ backup_keypair_info.public_key }}"
+
+    - name: "Prompt for deploying the key to BorgBase for backup client {{ item }}"
+      ansible.builtin.pause:
+        prompt: >-
+          If you want to backup to BorgBase,
+           please create a repo for backup client {{ item }}
+           and deploy the keys printed in the previous task accordingly.
+
+- name: "Create borg repo for backup client {{ item }}"
+  # Skip if backup client host is unreachable
+  when:
+    - backup_keypair_info is defined
+    - "'unreachable' not in backup_keypair_info or not backup_keypair_info.unreachable"
+  block:
+    - name: "Create authorized_keys entries allowing append-only backup for backup client {{ item }}"
+      ansible.posix.authorized_key:
+        user: "backup"
+        state: present
+        key: "{{ backup_keypair_info.public_key }}"
+        key_options: 'command="borg serve --append-only --restrict-to-repository {{ backup_repos_homedir }}/{{ item }}",restrict'
+      ignore_errors: "{{ ansible_check_mode }}"
+      
+    - name: "Initialize borg repo for backup client {{ item }}"
+      become: true
+      become_user: "backup"
+      become_method: "ansible.builtin.sudo"
+      become_flags: "-i"  # Necessary for borg executable to be found
+      ansible.builtin.command:
+        cmd: "borg init -e repokey-blake2 {{ backup_repos_homedir }}/{{ item }}"
+        creates: "{{ backup_repos_homedir }}/{{ item }}"
+      environment:
+        BORG_PASSPHRASE: "{% if item in hostvars %}{{ hostvars[item].backup_passphrase }}{% else %}{{ backup_passphrases_external_hosts[item] }}{% endif %}"
+      ignore_errors: "{{ ansible_check_mode }}"

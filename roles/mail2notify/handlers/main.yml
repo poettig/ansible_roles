@@ -1,0 +1,8 @@
+---
+
+- name: "Restart mail2notify"
+  ansible.builtin.systemd_service:
+    name: "mail2notify"
+    state: restarted
+    daemon_reload: true
+  ignore_errors: "{{ ansible_check_mode }}"

@@ -1,4 +1,4 @@
 ---
 
-python_venv_virtualenv_package_name: python-virtualenv
-python_venv_packaging_package_name: python-packaging
+python_venv_virtualenv_package_name: "python-virtualenv"
+python_venv_packaging_package_name: "python-packaging"

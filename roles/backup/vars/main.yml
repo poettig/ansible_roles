@@ -1,0 +1,4 @@
+---
+
+backup_script_template_name: backup.sh.j2
+backup_script_target_file_path: /usr/local/bin/backup.sh

@@ -1,0 +1,24 @@
+---
+
+- name: "Install prometheus-node-exporter and additional collectors"
+  ansible.builtin.apt:
+    name:
+      - prometheus-node-exporter
+      - prometheus-node-exporter-collectors
+    state: present
+  notify: "Restart node-exporter"
+
+- name: "Set node-exporter args"
+  ansible.builtin.lineinfile:
+    path: "/etc/default/prometheus-node-exporter"
+    regexp: "^ARGS=.*$"
+    line: "ARGS=\"{{ node_exporter_args | join(' ') }}\""
+    mode: 0644
+  notify: "Restart node-exporter"
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: "Enable systemd service"
+  ansible.builtin.systemd_service:
+    name: "prometheus-node-exporter"
+    enabled: true
+  ignore_errors: "{{ ansible_check_mode }}"

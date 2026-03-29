@@ -1,6 +1,6 @@
 ---
 
-- name: Install caddy global directives
-  include_tasks: add_generic_subconfig.yml
+- name: "Install caddy global directives"
+  ansible.builtin.include_tasks: add_generic_subconfig.yml
   vars:
     caddy_generic_subconfig: "{{ caddy_global_directive_config | combine({'directory': 'global.d'}) }}"

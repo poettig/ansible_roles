@@ -1,0 +1,29 @@
+www.{{ item.domain }} {
+    redir https://oettig.de{uri} permanent
+}
+
+{{ item.domain }} {
+    root /var/www/{{ item.domain }}
+    encode zstd gzip
+    file_server
+
+    log {
+        output file /var/log/caddy/{{ item.domain }}.log
+    }
+
+    header {
+        Strict-Transport-Security "max-age=31536000; preload; includeSubdomains"
+        X-XSS-Protection "1; mode=block"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "same-origin"
+    }
+
+    # Everything else gets a "go away" message
+    handle_errors 404 {
+        respond 404 {
+            body "Nothing to see here."
+            close
+        }
+    }
+}

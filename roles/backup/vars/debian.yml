@@ -1,0 +1,5 @@
+---
+
+backup_borg_system_dependencies:
+  - fuse3
+  - libfuse3-dev

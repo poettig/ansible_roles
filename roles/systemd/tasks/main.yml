@@ -1,0 +1,104 @@
+---
+
+- name: "Check if both script file and script template are defined"
+  ansible.builtin.fail:
+    msg: "Only one of systemd_script_file_name and systemd_script_template_name can be defined"
+  when: systemd_script_file_name is defined and systemd_script_template_name is defined
+
+- name: "Check if both source and destination are defined"
+  ansible.builtin.fail:
+    msg: "Either both or none of systemd_script_file_name / systemd_script_template_name and systemd_script_destination have to be defined"
+  when: ((systemd_script_file_name is defined or systemd_script_template_name is defined) and systemd_script_destination is not defined) or ((systemd_script_file_name is not defined and systemd_script_template_name is not defined) and systemd_script_destination is defined)
+
+- name: "Check if ExecStart exists"
+  ansible.builtin.fail:
+    msg: >-
+      systemd_script_destination is undefined and systemd_service_options does not contain ExecStart.
+      This would produce an invalid systemd service unit.
+  when: systemd_script_destination is undefined and (systemd_service_options is undefined or (systemd_service_options is defined and systemd_service_options and 'ExecStart' not in systemd_service_options))
+
+- name: "Check if systemd_notify.failed is true and conflicting arguments are given"
+  ansible.builtin.fail:
+    msg: >-
+      systemd_notify.failed is true and OnFailure= is given.
+      This would produce an invalid systemd service unit.
+  when: systemd_notify is defined and 'failed' in systemd_notify and systemd_notify.failed and systemd_unit_options is defined and systemd_unit_options and 'OnFailure' in systemd_unit_options
+
+- name: "Check if scheduled systemd service is requested and conflicting arguments are given"
+  ansible.builtin.fail:
+    msg: >-
+      A scheduled systemd service is requested but Type= is given.
+      Scheduled services with a Type other than oneshot are not supported.
+  when: systemd_timer_options is defined and systemd_service_options is defined and 'Type' in systemd_service_options
+
+- name: "Copy systemd script"
+  ansible.builtin.copy:
+    src: "{{ systemd_script_file_name }}"
+    dest: "{{ systemd_script_destination }}"
+    owner: "{{ systemd_script_owner }}"
+    group: "{{ systemd_script_group }}"
+    mode: "{{ systemd_script_mode }}"
+  when: "systemd_script_file_name is defined"
+
+- name: "Template systemd script"
+  ansible.builtin.template:
+    src: "{{ systemd_script_template_name }}"
+    dest: "{{ systemd_script_destination }}"
+    owner: "{{ systemd_script_owner }}"
+    group: "{{ systemd_script_group }}"
+    mode: "{{ systemd_script_mode }}"
+  when: "systemd_script_template_name is defined"
+
+- name: "Ensure that systemd base directory exists"
+  ansible.builtin.file:
+    path: "{{ systemd_base_directory }}"
+    state: directory
+    mode: 0755
+
+- name: "Deploy systemd service file"
+  ansible.builtin.template:
+    src: "systemd-service.j2"
+    dest: "{{ systemd_base_directory }}/{{ systemd_name }}.service"
+    mode: 0644
+  register: systemd_service_file_deploy
+
+- name: "Notify restart service if it is not oneshot and there is no timer for it, but only if the service file changed"
+  ansible.builtin.debug:
+    msg: "Notified {{ systemd_notify_handler_name | default(None) or ('to restart ' + systemd_name) }}"
+  changed_when: true
+  when:
+    - systemd_timer_options is not defined
+    - systemd_service_option is not defined or 'Type' not in systemd_service_options or systemd_service_options.Type != 'oneshot'
+    - systemd_service_file_deploy.changed
+    - systemd_service_restart
+  notify: "{{ systemd_notify_handler_name | default(None) or ('Restart ' + systemd_name) }}"
+
+- name: "Start systemd service if not oneshot and the service should be enabled"
+  ansible.builtin.systemd_service:
+    name: "{{ systemd_name }}"
+    state: started
+    enabled: true
+    daemon_reload: true
+  ignore_errors: "{{ ansible_check_mode }}"
+  when:
+    - systemd_service_enable
+    - systemd_service_option is not defined or 'Type' not in systemd_service_options or systemd_service_options.Type != 'oneshot'
+
+- name: "Deploy systemd-timer"
+  ansible.builtin.template:
+    src: "systemd-timer.j2"
+    dest: "{{ systemd_base_directory }}/{{ systemd_name }}.timer"
+    mode: 0644
+  when: systemd_timer_options is defined
+
+- name: "Reload systemd config"
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+
+- name: "Enable systemd timer"
+  ansible.builtin.systemd_service:
+    name: "{{ systemd_name }}.timer"
+    enabled: true
+    state: started
+  ignore_errors: "{{ ansible_check_mode }}"
+  when: systemd_timer_options is defined

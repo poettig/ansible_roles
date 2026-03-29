@@ -1,0 +1,27 @@
+// {{ ansible_managed }}
+Unattended-Upgrade::Origins-Pattern {
+{% if apt_unattended_upgrades_security_only %}
+        "origin=Debian,codename=${distro_codename},label=Debian-Security";
+        "origin=Debian,codename=${distro_codename}-security,label=Debian-Security";
+{% else %}
+		"origin=*";
+{% endif %}
+};
+
+Unattended-Upgrade::Package-Blacklist {
+{% for pkg in apt_unattended_upgrades_package_excludes %}
+  "{{ pkg }}";
+{% endfor %}
+};
+
+Unattended-Upgrade::MinimalSteps "true";
+Unattended-Upgrade::Mail "{{ apt_unattended_upgrades_monitoring_mail }}";
+Unattended-Upgrade::MailReport "on-change";
+Unattended-Upgrade::Remove-Unused-Kernel-Packages "true";
+Unattended-Upgrade::Automatic-Reboot "{{ apt_unattended_upgrades_do_reboot | to_json }}";
+
+// Override untouched config files, keep the local one for modified config files
+Dpkg::Options {
+    "--force-confdef";
+    "--force-confold";
+}

@@ -1,0 +1,3 @@
+---
+
+notifier_systemd_base_directory: "/etc/systemd/system"

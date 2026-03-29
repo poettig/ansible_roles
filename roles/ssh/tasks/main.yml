@@ -1,0 +1,32 @@
+---
+
+- name: "Load OS dependent variables"
+  ansible.builtin.include_vars:
+    file: "{{ ansible_facts['distribution'] | lower }}.yml"
+  failed_when: false  # never fail, even if the file does not exist
+
+- name: "Install openssh-server"
+  ansible.builtin.package:
+    name: "{{ ssh_package_name }}"
+
+- name: "Copy sshd config files"
+  ansible.builtin.template:
+    src: "{{ item }}"
+    dest: "/etc/ssh/sshd_config.d/{{ item | basename | replace('.j2', '') }}"
+    mode: 0644
+  with_fileglob: "templates/sshd_config.d/*.j2"
+  notify: "Restart sshd"
+
+- name: "Create authorized_keys entries allowing ssh access to the specific user"
+  ansible.posix.authorized_key:
+    user: "{{ item.user }}"
+    key: "{{ item.keys_from | map('extract', ssh_keys) | flatten | join('\n') }}"
+    state: present
+  loop: "{{ ssh_users }}"
+  loop_control:
+    label: "target user: {{ item.user }}, allowed persons: {{ item.keys_from | join(', ') }}"
+
+- name: "Enable openssh-server"
+  ansible.builtin.systemd_service:
+    name: "{{ ssh_service_name }}"
+    enabled: true

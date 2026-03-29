@@ -5,14 +5,13 @@
   ansible.builtin.uri:
     url: "https://api.github.com/repos/{{ github_latest_release_project_path }}/releases/latest"
     return_content: true
-    body_format: json
+    body_format: "json"
   register: github_latest_release_info
 
-- name: Fail if asset regex matches nothing
-  ansible.builtin.fail:
+- name: "Assert that the given asset regex matches one of the release assets"
+  ansible.builtin.assert:
+    that:  (github_latest_release_info.json.assets | selectattr('name', 'search', github_latest_release_asset_name_regex)) | length > 0
     msg: "'{{ github_latest_release_asset_name_regex }}' does not match any asset name. Available asset names: {{ github_latest_release_info.json.assets | map(attribute='name') | join(', ') }}"
-  when:  (github_latest_release_info.json.assets | selectattr('name', 'search', github_latest_release_asset_name_regex)) | length == 0
-
 
 - name: "Set up extra variables for often necessary information"
   ansible.builtin.set_fact:

@@ -1,0 +1,8 @@
+{% set logo_path = 'files/' + inventory_hostname + '/motd_logo.txt' %}
+{% if logo_path is exists %}
+{{ lookup('file', logo_path) }}
+{% endif %}
+
+Welcome to {{ inventory_hostname }}!
+This machine is ansible managed.{% if motd_contact is defined %} Contact {{ motd_contact }} for configuration changes.{% endif +%}
+

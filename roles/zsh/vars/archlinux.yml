@@ -1,0 +1,6 @@
+---
+
+zsh_package_names:
+  - zsh
+  - fzf
+  - fd

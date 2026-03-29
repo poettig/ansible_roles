@@ -1,0 +1,53 @@
+---
+
+- name: "Set shell to zsh and discover user home"
+  ansible.builtin.user:
+    name: "{{ item }}"
+    shell: "/usr/bin/zsh"
+  register: zsh_user_info
+
+- name: "Clone oh-my-zsh repo"
+  become: true
+  become_user: "{{ item }}"
+  ansible.builtin.git:
+    repo: "https://github.com/ohmyzsh/ohmyzsh.git"
+    dest: "{{ zsh_user_info.home }}/.oh-my-zsh"
+    update: true
+    version: "master"
+  diff: false
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: "Clone zsh-syntax-highlighting"
+  become: true
+  become_user: "{{ item }}"
+  ansible.builtin.git:
+    repo: "https://github.com/zsh-users/zsh-syntax-highlighting.git"
+    dest: "{{ zsh_user_info.home }}/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting"
+    update: true
+    version: "master"
+  diff: false
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: "Deploy zsh theme"
+  ansible.builtin.copy:
+    src: "peet.zsh-theme"
+    dest: "{{ zsh_user_info.home }}/.oh-my-zsh/themes/peet.zsh-theme"
+    owner: "{{ item }}"
+    group: "{{ item }}"
+    mode: 0640
+
+- name: "Deploy .zshenv"
+  ansible.builtin.copy:
+    src: ".zshenv"
+    dest: "{{ zsh_user_info.home }}/.zshenv"
+    owner: "{{ item }}"
+    group: "{{ item }}"
+    mode: 0640
+
+- name: "Deploy .zshrc"
+  ansible.builtin.template:
+    src: ".zshrc.j2"
+    dest: "{{ zsh_user_info.home }}/.zshrc"
+    owner: "{{ item }}"
+    group: "{{ item }}"
+    mode: 0750

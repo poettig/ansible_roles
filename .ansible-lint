@@ -1,0 +1,10 @@
+---
+
+profile: production
+exclude_paths:
+  - .cache/
+  - venv/
+skip_list:
+  - yaml[line-length]
+  - galaxy[tags]
+  - galaxy[no-changelog]

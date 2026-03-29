@@ -1,0 +1,7 @@
+---
+
+- name: "Install tmux config"
+  ansible.builtin.copy:
+    src: "tmux.conf"
+    dest: "/etc/tmux.conf"
+    mode: 0644

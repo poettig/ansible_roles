@@ -1,0 +1,38 @@
+---
+
+- name: "Assert that action body contains at least the key event_type"
+  ansible.builtin.assert:
+    that: "'event_type' in github_deploy_action_body"
+    msg: "GitHub action body does not contain the required event_type key. The current body is {{ github_deploy_action_body | to_json() }}"
+
+- name: "Check if github action has to be executed"
+  ansible.builtin.stat:
+    path: "{{ github_deploy_action_sentinel_file }}"
+  register: github_deploy_action_sentinel_file_stat
+
+- name: "Run github deploy action"
+  when: not github_deploy_action_sentinel_file_stat.stat.exists
+  block:
+    - name: "Start github deploy action"
+      ansible.builtin.uri:
+        method: "post"
+        url: "https://api.github.com/repos/{{ github_deploy_action_repo_path }}/dispatches"
+        body: "{{ github_deploy_action_body | to_json() }}"
+        body_format: "json"
+        status_code:
+          - 200
+          - 204
+        headers:
+          Accept: "application/vnd.github+json"
+          Authorization: "token {{ github_deploy_action_access_token }}"
+      register: github_deploy_action_response
+
+    - name: "Print action URL"
+      ansible.builtin.debug:
+        msg: "Deploy action URL: {{ github_deploy_action_response.json.html_url | default('<Failed to get URL from response>') }}"
+
+    - name: "Wait for github action to complete"
+      ansible.builtin.wait_for:
+        path: "{{ github_deploy_action_sentinel_file }}"
+        state: present
+        timeout: 7200

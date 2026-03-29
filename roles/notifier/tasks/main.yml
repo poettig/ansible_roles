@@ -1,0 +1,155 @@
+---
+
+- name: "Load OS dependent variables"
+  ansible.builtin.include_vars:
+    file: "{{ ansible_facts['distribution'] | lower }}.yml"
+  failed_when: false  # never fail, even if the file does not exist
+
+- name: "Install libolm"
+  ansible.builtin.package:
+    name:
+      - "{{ notifier_libolm_package_name }}"
+
+- name: "Create venv for notifier"
+  ansible.builtin.include_role:
+    name: "poettig.roles.python_venv"
+  vars:
+    python_venv_directory: "/var/lib/matrix-notifier/venv"
+    python_venv_modules: "{{ lookup('file', 'requirements-notifier.txt') | split('\n') }}"
+    python_venv_handlers_to_notify: "Send test message"
+
+- name: "Install notifier"
+  ansible.builtin.copy:
+    src: "notifier.py"
+    dest: "/usr/local/bin/"
+    mode: 0755
+  notify: "Send test message"
+
+- name: "Install systemd-notifier"
+  ansible.builtin.copy:
+    src: "systemd-notifier"
+    dest: "/usr/local/bin/systemd-notifier"
+    mode: 0755
+
+- name: "Install systemd-notifier services"
+  ansible.builtin.copy:
+    src: "{{ notifier_service_item }}"
+    dest: "{{ notifier_systemd_base_directory }}/"
+    mode: 0644
+  with_fileglob: "files/*.service"
+  loop_control:
+    loop_var: notifier_service_item
+
+- name: "Install matrix-gateway"
+  ansible.builtin.include_role:
+    name: "poettig.roles.python_service"
+  vars:
+    python_service_name: "matrix-gateway"
+    python_service_description: "A gateway to matrix via REST API"
+    python_service_script: "matrix-gateway.py"
+    python_service_script_args:
+      - "-s /var/lib/matrix-gateway/store"
+      - "-c /var/lib/matrix-gateway/credentials.json"
+      - "-p 3578"
+      - "-v"
+    python_service_requirements_file: "files/requirements-gateway.txt"
+    python_service_systemd_unit_options_additional:
+      StartLimitIntervalSec: 0
+    python_service_systemd_service_options_additional:
+      Restart: "on-failure"
+      RestartSec: "1s"
+    python_service_handlers_to_notify_test_message:
+      - "Send test message"
+
+- name: "Wait for matrix-gateway to be available"
+  ansible.builtin.wait_for:
+    port: 3578
+    timeout: 10
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: "Get matrix-gateway status before login block"
+  ansible.builtin.uri:
+    url: "http://localhost:3578/status"
+  register: notifier_status_before_login_block
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: "Log in matrix-gateway"
+  when:
+    - not ansible_check_mode
+    - notifier_status_before_login_block is defined
+    - '"json" in notifier_status_before_login_block'
+    - notifier_status_before_login_block.json.status == "not-configured"
+  notify: Send test message
+  block:
+    - name: "Perform login"
+      ansible.builtin.uri:
+        url: "http://localhost:3578/login"
+        method: "post"
+        body_format: "json"
+        body:
+          homeserver_url: "https://matrix.org"
+          user_id: "@peetbot:matrix.org"
+          password: "{{ notifier_matrix_account_password }}"
+          device_name: "{{ inventory_hostname }}-notifier"
+      register: notifier_login_response
+      changed_when: notifier_login_response.status == 200
+
+    - name: "Get matrix-gateway status after login"
+      ansible.builtin.uri:
+        url: "http://localhost:3578/status"
+      register: "notifier_status_after_login"
+      until: notifier_status_after_login.json.status == "not-verified"
+      retries: 5
+      delay: 2
+
+- name: "Get matrix-gateway status before verification block"
+  ansible.builtin.uri:
+    url: "http://localhost:3578/status"
+  register: notifier_status_before_verification_block
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: "Verify matrix-gateway device"
+  when:
+    - not ansible_check_mode
+    - notifier_status_before_verification_block is defined
+    - "'json' in notifier_status_before_verification_block"
+    - notifier_status_before_verification_block.json.status == "not-verified"
+  notify: Send test message
+  block:
+    - name: "Ask user to start verification from another matrix client"
+      ansible.builtin.debug:
+        msg: "Please start the verification on another matrix client. You have 30 seconds."
+
+    - name: "Get emoji list"
+      ansible.builtin.uri:
+        url: "http://localhost:3578/emoji"
+      register: notifier_emojis
+      until: notifier_emojis.status == 200
+      retries: 15 # Give user 30s to start verification
+      delay: 2
+
+    - name: "Print emoji list"
+      ansible.builtin.debug:
+        msg:
+          - "Verification emoji"
+          - "{% for emoji in notifier_emojis.json %}{{ emoji[0] }} {% endfor %}"
+          - "{% for emoji in notifier_emojis.json %}{{ emoji[1] }} {% endfor %}"
+
+    - name: "Ask for confirmation"
+      ansible.builtin.pause:
+        prompt: "Is this correct? If yes, don't forget to accept on the other client. If not, abort the playbook"
+
+    - name: "Accept verification"
+      ansible.builtin.uri:
+        url: "http://localhost:3578/verify"
+        method: "post"
+      register: notifier_verify_response
+      changed_when: notifier_verify_response.status == 200
+
+    - name: "Get matrix-gateway status after verification"
+      ansible.builtin.uri:
+        url: "http://localhost:3578/status"
+      register: notifier_status_after_verification
+      until: notifier_status_after_verification.json.status == "ready"
+      retries: 15 # 30s to accept on the other device
+      delay: 2

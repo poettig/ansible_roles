@@ -1,0 +1,44 @@
+---
+
+- name: "Collect user info"
+  ansible.builtin.user:
+    name: "{{ item }}"
+  register: chezmoi_user_info
+
+- name: "Ensure that config directory exists"
+  ansible.builtin.file:
+    path: "{{ chezmoi_user_info.home }}/.config/chezmoi"
+    state: directory
+    owner: "{{ chezmoi_user_info.uid }}"
+    group: "{{ chezmoi_user_info.group }}"
+    mode: 0750
+
+- name: "Copy chezmoi config file"
+  ansible.builtin.copy:
+    dest: "{{ chezmoi_user_info.home }}/.config/chezmoi/chezmoi.toml"
+    owner: "{{ chezmoi_user_info.uid }}"
+    group: "{{ chezmoi_user_info.group }}"
+    mode: 0600
+    content: |
+      encryption = "age"
+
+      [age]
+      passphrase = true
+
+      [git]
+      autoCommit = true
+      autoPush = true
+      commitMessageTemplate = "{% raw %}{{ promptString \"Commit message\" }}{% endraw %}"
+
+- name: "Initialize chezmoi"
+  become: true
+  become_user: "{{ chezmoi_user_info.name }}"
+  ansible.builtin.command: 
+    cmd: "chezmoi init {{ chezmoi_repo_url }}"
+    creates: "{{ chezmoi_user_info.home }}/.local/share/chezmoi"
+  register: chezmoi_initialize_result
+
+- name: "Tell user that they have to apply chezmoi themselves"
+  ansible.builtin.pause:
+    prompt: "chezmoi is initialized now. You will have to apply chezmoi-managed files yourself - check changes with `chezmoi diff`, then `chezmoi apply` if everything is fine."
+  when: chezmoi_initialize_result.changed  # noqa: no-handler - interrupt should happen directly to no break following roles that might depend on chezmoi being applied

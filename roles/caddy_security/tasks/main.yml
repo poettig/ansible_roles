@@ -1,0 +1,15 @@
+---
+
+- name: "Assert that either an identity provider + authentication portal or an authorization policy is defined"
+  ansible.builtin.assert:
+    that: (caddy_security_identity_provider_google_client_id is defined and caddy_security_authentication_portals is defined) or caddy_security_authorization_policies is defined
+    msg: "Please specify either an authentication portal or an authorization policy."
+
+- name: "Add caddy security global config to caddy"
+  ansible.builtin.include_role:
+    name: "poettig.roles.caddy"
+    tasks_from: add_global_directive_config.yml
+  vars:
+    caddy_global_directive_config:
+      template: "caddy-security-global.conf.j2"
+      target_filename: "caddy-security.conf"

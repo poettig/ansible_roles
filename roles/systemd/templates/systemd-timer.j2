@@ -1,0 +1,10 @@
+[Unit]
+Description=Start {{ systemd_timer_description }}
+
+[Timer]
+{% for k,v in systemd_timer_options.items() %}
+{{ k }}={{ v }}
+{% endfor %}
+
+[Install]
+WantedBy=timers.target

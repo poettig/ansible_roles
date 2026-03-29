@@ -1,0 +1,29 @@
+{{ vaultwarden_fqdn }} {
+    log {
+        output file /var/log/caddy/vaultwarden.log
+    }
+
+    encode zstd gzip
+
+    header {
+        Strict-Transport-Security "max-age=31536000; preload; includeSubdomains"
+        X-XSS-Protection "1; mode=block"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "sameorigin" # Required by Webauthn, see https://github.com/dani-garcia/vaultwarden/wiki/Proxy-examples
+        Referrer-Policy "same-origin"
+        X-Robots-Tag "noindex, nofollow"
+        -Server
+        -X-Powered-By
+		-Last-Modified
+    }
+
+    handle {
+        # No internet access to the admin panel, use SSH tunneling to access the Vaultwarden admin interface
+        respond /admin* 404
+        reverse_proxy localhost:7843 {
+            # Send the true remote IP to Rocket, so that Vaultwarden can put this in the
+            # log, so that fail2ban can ban the correct IP.
+            header_up X-Real-IP {remote_host}
+        }
+    }
+}

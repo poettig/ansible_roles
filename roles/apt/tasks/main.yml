@@ -1,0 +1,32 @@
+---
+
+- name: "Install ansible dependencies"
+  ansible.builtin.apt:
+    name: "python3-apt"
+    state: present
+  check_mode: false  # Always run as the ansible apt module needs this
+
+- name: "Install unattended-upgrades and needrestart"
+  ansible.builtin.apt:
+    update_cache: true
+    pkg:
+      - "unattended-upgrades"
+      - "needrestart"
+
+- name: "Deploy /etc/apt/apt.conf.d/50unattended-upgrades"
+  ansible.builtin.template:
+    src: "templates/50unattended-upgrades.j2"
+    dest: "/etc/apt/apt.conf.d/50unattended-upgrades"
+    mode: 0644
+
+- name: "Deploy /etc/apt/apt.conf.d/20auto-upgrades"
+  ansible.builtin.template:
+    src: "templates/20auto-upgrades.j2"
+    dest: "/etc/apt/apt.conf.d/20auto-upgrades"
+    mode: 0644
+
+- name: "Auto Restart services with needrestart"
+  ansible.builtin.copy:
+    content: "$nrconf{restart} = 'a';"
+    dest: "/etc/needrestart/conf.d/auto-restart.conf"
+    mode: 0644
