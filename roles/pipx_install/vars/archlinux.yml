@@ -1,5 +1,5 @@
 ---
 
 pipx_install_dependencies:
-  - python-pipx
-  - python-pylibacl
+  - "python-pipx"
+  - "python-pylibacl"

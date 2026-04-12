@@ -37,7 +37,7 @@
         key: "{{ backup_keypair_info.public_key }}"
         key_options: 'command="borg serve --append-only --restrict-to-repository {{ backup_repos_homedir }}/{{ item }}",restrict'
       ignore_errors: "{{ ansible_check_mode }}"
-      
+
     - name: "Initialize borg repo for backup client {{ item }}"
       become: true
       become_user: "backup"

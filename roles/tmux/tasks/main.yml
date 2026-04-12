@@ -4,4 +4,4 @@
   ansible.builtin.copy:
     src: "tmux.conf"
     dest: "/etc/tmux.conf"
-    mode: 0644
+    mode: "0644"

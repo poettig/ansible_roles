@@ -13,7 +13,7 @@
   vars:
     backup_borg_install_user: "{{ backup_user_info.name }}"
 
-- name: Create authorized_keys entries allowing full access to backups
+- name: "Create authorized_keys entries allowing full access to backups"
   ansible.posix.authorized_key:
     user: "{{ backup_user_info.name }}"
     state: present
@@ -26,7 +26,7 @@
   ansible.builtin.copy:
     src: "accept_borgpp.conf"
     dest: "/etc/ssh/sshd_config.d/accept_borgpp.conf"
-    mode: 0644
+    mode: "0644"
 
 - name: "Create repo for each backup client"
   ansible.builtin.include_tasks: create_backup_repo_on_backup_target.yml

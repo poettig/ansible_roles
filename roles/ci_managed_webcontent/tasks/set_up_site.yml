@@ -12,7 +12,7 @@
     state: directory
     owner: "{{ ci_managed_webcontent_user_info.uid }}"
     group: "{{ ci_managed_webcontent_user_info.group }}"
-    mode: 0700
+    mode: "0700"
 
 - name: "Install allowed-commands.sh"
   ansible.builtin.template:
@@ -20,7 +20,7 @@
     dest: "{{ ci_managed_webcontent_user_info.home }}/.ssh/allowed-commands.sh"
     owner: "{{ ci_managed_webcontent_user_info.uid }}"
     group: "{{ ci_managed_webcontent_user_info.group }}"
-    mode: 0700
+    mode: "0700"
   register: ci_managed_webcontent_allowed_commands_install_result
   when: "'allowed_commands_script_template' in ci_managed_webcontent_site"
 
@@ -31,7 +31,7 @@
     dest: "{{ ci_managed_webcontent_user_info.home }}/.ssh/authorized_keys"
     owner: "{{ ci_managed_webcontent_user_info.uid }}"
     group: "{{ ci_managed_webcontent_user_info.group }}"
-    mode: 0600
+    mode: "0600"
 
 - name: "Create deploy directory"
   ansible.builtin.file:
@@ -39,7 +39,7 @@
     state: directory
     owner: "{{ ci_managed_webcontent_user_info.uid }}"
     group: "{{ ci_managed_webcontent_user_info.group }}"
-    mode: 0755
+    mode: "0755"
 
 - name: "Add site config to caddy"
   ansible.builtin.include_role:

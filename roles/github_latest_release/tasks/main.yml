@@ -10,7 +10,7 @@
 
 - name: "Assert that the given asset regex matches one of the release assets"
   ansible.builtin.assert:
-    that:  (github_latest_release_info.json.assets | selectattr('name', 'search', github_latest_release_asset_name_regex)) | length > 0
+    that: (github_latest_release_info.json.assets | selectattr('name', 'search', github_latest_release_asset_name_regex)) | length > 0
     msg: "'{{ github_latest_release_asset_name_regex }}' does not match any asset name. Available asset names: {{ github_latest_release_info.json.assets | map(attribute='name') | join(', ') }}"
 
 - name: "Set up extra variables for often necessary information"

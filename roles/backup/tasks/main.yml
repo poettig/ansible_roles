@@ -43,13 +43,13 @@
       ansible.builtin.template:
         src: "{{ backup_script_template_name }}"
         dest: "{{ backup_script_target_file_path }}"
-        mode: 0755
+        mode: "0755"
 
     - name: "Install systemd service unit"
       ansible.builtin.copy:
         src: "{{ inventory_hostname }}/backup.service"
         dest: "/etc/systemd/system/backup.service"
-        mode: 0644
+        mode: "0644"
 
     - name: "Enable backup systemd service unit"
       ansible.builtin.systemd_service:
@@ -78,5 +78,5 @@
   ansible.builtin.copy:
     src: "borg_compact.sh"
     dest: "/usr/local/bin/borg-compact"
-    mode: 0700
+    mode: "0700"
   when: backup_install_borg_compact

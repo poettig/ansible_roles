@@ -1,6 +1,6 @@
 ---
 
 zsh_package_names:
-  - zsh
-  - fzf
-  - fd-find
+  - "zsh"
+  - "fzf"
+  - "fd-find"

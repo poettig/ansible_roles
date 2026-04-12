@@ -16,7 +16,7 @@
     dest: "/etc/profile.d/ssh_auth_sock.sh"
     content: |
       export SSH_AUTH_SOCK=$XDG_RUNTIME_DIR/ssh-agent.socket
-    mode: 0644
+    mode: "0644"
   when: system_settings_ssh_agent_users is defined
 
 - name: "Check if faillock.conf exists"

@@ -11,14 +11,14 @@
     state: directory
     owner: "{{ chezmoi_user_info.uid }}"
     group: "{{ chezmoi_user_info.group }}"
-    mode: 0750
+    mode: "0750"
 
 - name: "Copy chezmoi config file"
   ansible.builtin.copy:
     dest: "{{ chezmoi_user_info.home }}/.config/chezmoi/chezmoi.toml"
     owner: "{{ chezmoi_user_info.uid }}"
     group: "{{ chezmoi_user_info.group }}"
-    mode: 0600
+    mode: "0600"
     content: |
       encryption = "age"
 
@@ -33,7 +33,7 @@
 - name: "Initialize chezmoi"
   become: true
   become_user: "{{ chezmoi_user_info.name }}"
-  ansible.builtin.command: 
+  ansible.builtin.command:
     cmd: "chezmoi init {{ chezmoi_repo_url }}"
     creates: "{{ chezmoi_user_info.home }}/.local/share/chezmoi"
   register: chezmoi_initialize_result

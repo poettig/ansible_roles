@@ -34,7 +34,7 @@
     dest: "{{ zsh_user_info.home }}/.oh-my-zsh/themes/peet.zsh-theme"
     owner: "{{ item }}"
     group: "{{ item }}"
-    mode: 0640
+    mode: "0640"
 
 - name: "Deploy .zshenv"
   ansible.builtin.copy:
@@ -42,7 +42,7 @@
     dest: "{{ zsh_user_info.home }}/.zshenv"
     owner: "{{ item }}"
     group: "{{ item }}"
-    mode: 0640
+    mode: "0640"
 
 - name: "Deploy .zshrc"
   ansible.builtin.template:
@@ -50,4 +50,4 @@
     dest: "{{ zsh_user_info.home }}/.zshrc"
     owner: "{{ item }}"
     group: "{{ item }}"
-    mode: 0750
+    mode: "0750"

@@ -24,7 +24,7 @@
       LC_TELEPHONE=de_DE.UTF-8
       LC_TIME=en_DK.UTF-8
     dest: "/etc/default/locale"
-    mode: 0644
+    mode: "0644"
 
 - name: "Set timezone"
   community.general.timezone:
@@ -34,13 +34,13 @@
   ansible.builtin.copy:
     content: "{{ inventory_hostname }}"
     dest: "/etc/mailname"
-    mode: 0644
+    mode: "0644"
 
 - name: "Set hostname in /etc/hostname"
   ansible.builtin.copy:
     content: "{{ inventory_hostname.partition('.')[0] }}"
     dest: "/etc/hostname"
-    mode: 0644
+    mode: "0644"
 
 - name: "Set hostname immediately"
   ansible.builtin.hostname:
@@ -54,13 +54,13 @@
       ff02::1   ip6-allnodes
       ff02::2   ip6-allrouters
     dest: "/etc/hosts"
-    mode: 0644
+    mode: "0644"
 
 - name: "Deploy motd"
   ansible.builtin.template:
     src: "motd.j2"
     dest: "/etc/motd"
-    mode: 0644
+    mode: "0644"
 
 - name: "Add client settings if enabled"
   ansible.builtin.include_tasks: client.yml

@@ -21,7 +21,7 @@
     state: directory
     owner: "{{ caddy_user_info.uid }}"
     group: "{{ caddy_user_info.group }}"
-    mode: 0755
+    mode: "0755"
 
 - name: "Install caddy config generator"
   ansible.builtin.copy:
@@ -29,13 +29,13 @@
     dest: "{{ caddy_executables_directory }}/generate_caddy_config.sh"
     owner: "{{ caddy_user_info.uid }}"
     group: "{{ caddy_user_info.group }}"
-    mode: 0700
+    mode: "0700"
 
 - name: "Install caddy service"
   ansible.builtin.template:
     src: "caddy.service.j2"
     dest: "/etc/systemd/system/caddy.service"
-    mode: 0644
+    mode: "0644"
   notify: "Restart caddy"
 
 - name: "Deploy caddy updater script"
@@ -44,7 +44,7 @@
     dest: "{{ caddy_executables_directory }}/update_caddy.sh"
     owner: "{{ caddy_user_info.uid }}"
     group: "{{ caddy_user_info.group }}"
-    mode: 0700
+    mode: "0700"
 
 - name: "Allow user caddy to restart caddy"
   community.general.sudoers:
@@ -66,13 +66,13 @@
   ansible.builtin.template:
     src: "caddy-updater.service.j2"
     dest: "/etc/systemd/system/caddy-updater.service"
-    mode: 0644
+    mode: "0644"
 
 - name: "Install caddy updater timer"
   ansible.builtin.template:
     src: "caddy-updater.timer.j2"
     dest: "/etc/systemd/system/caddy-updater.timer"
-    mode: 0644
+    mode: "0644"
 
 - name: "Create caddy config directory"
   ansible.builtin.file:
@@ -80,7 +80,7 @@
     state: directory
     owner: "{{ caddy_user_info.uid }}"
     group: "{{ caddy_user_info.group }}"
-    mode: 0700
+    mode: "0700"
   notify: "Reload caddy"
 
 - name: "Install caddy main config"
@@ -89,7 +89,7 @@
     dest: "/etc/caddy/Caddyfile"
     owner: "{{ caddy_user_info.uid }}"
     group: "{{ caddy_user_info.group }}"
-    mode: 0600
+    mode: "0600"
   notify: "Reload caddy"
 
 - name: "Create a webroot if requested"
@@ -98,7 +98,7 @@
     state: directory
     owner: "{{ caddy_user_info.uid }}"
     group: "{{ caddy_user_info.group }}"
-    mode: 0755
+    mode: "0755"
   when: caddy_webroot is defined
 
 - name: "Enable caddy"

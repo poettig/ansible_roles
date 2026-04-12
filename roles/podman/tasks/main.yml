@@ -15,7 +15,7 @@
     content: |
       [engine]
       cgroup_manager = "cgroupfs"
-    mode: 0644
+    mode: "0644"
 
 - name: "Install /etc/containers/storage.conf"
   ansible.builtin.copy:
@@ -26,4 +26,4 @@
       runroot = "/run/containers/storage"
       graphroot = "/var/lib/containers/storage"
       rootless_storage_path = "$HOME/.local/share/containers/storage"
-    mode: 0644
+    mode: "0644"

@@ -1,32 +1,32 @@
 ---
 
-- name: Check if caddy is active
+- name: "Check if caddy is active"
   ansible.builtin.systemd_service:
-    name: caddy
+    name: "caddy"
   register: caddy_reload_handler_status
-  listen: Reload caddy
+  listen: "Reload caddy"
   ignore_errors: "{{ ansible_check_mode }}"
 
-- name: Reload caddy
+- name: "Reload caddy"
   ansible.builtin.systemd_service:
-    name: caddy
+    name: "caddy"
     state: reloaded
   when: caddy_reload_handler_status.status.ActiveState == "active"
-  listen: Reload caddy
+  listen: "Reload caddy"
   ignore_errors: "{{ ansible_check_mode }}"
 
-- name: Restart caddy instead of reloading as it is currently not active
+- name: "Restart caddy instead of reloading as it is currently not active"
   ansible.builtin.systemd_service:
-    name: caddy
+    name: "caddy"
     state: restarted
     daemon_reload: true
   when: caddy_reload_handler_status.status.ActiveState != "active"
-  listen: Reload caddy
+  listen: "Reload caddy"
   ignore_errors: "{{ ansible_check_mode }}"
 
-- name: Restart caddy
+- name: "Restart caddy"
   ansible.builtin.systemd_service:
-    name: caddy
+    name: "caddy"
     state: restarted
     daemon_reload: true
   ignore_errors: "{{ ansible_check_mode }}"

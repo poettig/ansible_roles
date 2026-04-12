@@ -12,7 +12,7 @@
     state: directory
     owner: "{{ vaultwarden_user_info.uid }}"
     group: "{{ vaultwarden_user_info.group }}"
-    mode: 0755
+    mode: "0755"
 
 - name: "Setup vaultwarden podman service"
   ansible.builtin.include_role:

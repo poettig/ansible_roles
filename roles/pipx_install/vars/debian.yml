@@ -1,11 +1,11 @@
 ---
 
 pipx_install_dependencies:
-  - pipx
-  - build-essential
-  - libacl1
-  - libacl1-dev
-  - libssl-dev
-  - liblz4-dev
-  - libzstd-dev
-  - libxxhash-dev
+  - "pipx"
+  - "build-essential"
+  - "libacl1"
+  - "libacl1-dev"
+  - "libssl-dev"
+  - "liblz4-dev"
+  - "libzstd-dev"
+  - "libxxhash-dev"

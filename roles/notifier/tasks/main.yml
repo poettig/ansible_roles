@@ -22,20 +22,20 @@
   ansible.builtin.copy:
     src: "notifier.py"
     dest: "/usr/local/bin/"
-    mode: 0755
+    mode: "0755"
   notify: "Send test message"
 
 - name: "Install systemd-notifier"
   ansible.builtin.copy:
     src: "systemd-notifier"
     dest: "/usr/local/bin/systemd-notifier"
-    mode: 0755
+    mode: "0755"
 
 - name: "Install systemd-notifier services"
   ansible.builtin.copy:
     src: "{{ notifier_service_item }}"
     dest: "{{ notifier_systemd_base_directory }}/"
-    mode: 0644
+    mode: "0644"
   with_fileglob: "files/*.service"
   loop_control:
     loop_var: notifier_service_item

@@ -29,7 +29,7 @@
     state: directory
     owner: "{{ backup_borg_install_user_info.name }}"
     group: "{{ backup_borg_install_user_info.group }}"
-    mode: 0755
+    mode: "0755"
   ignore_errors: "{{ ansible_check_mode }}"
   loop_control:
     loop_var: dirname
@@ -43,5 +43,5 @@
     dest: "{{ backup_borg_install_user_info.home }}/.config/borg/"
     owner: "{{ backup_borg_install_user_info.name }}"
     group: "{{ backup_borg_install_user_info.group }}"
-    mode: 0600
+    mode: "0600"
   ignore_errors: "{{ ansible_check_mode }}"

@@ -13,11 +13,11 @@
 - name: "Install fail2ban jail.local"
   ansible.builtin.copy:
     dest: "/etc/fail2ban/jail.local"
-    mode: 0644
+    mode: "0644"
     content: |
       [DEFAULT]
       banaction = nftables[type=allports]
-      
+
       [sshd]
       enabled = true
       backend = systemd

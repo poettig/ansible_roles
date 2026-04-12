@@ -1,6 +1,6 @@
 ---
 
-apt_unattended_upgrades_monitoring_mail: root
+apt_unattended_upgrades_monitoring_mail: "root"
 apt_unattended_upgrades_security_only: false
 apt_unattended_upgrades_package_excludes: []
 apt_unattended_upgrades_do_reboot: false

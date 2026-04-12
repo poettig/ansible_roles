@@ -2,4 +2,4 @@
 
 zsh_set_ssh_auth_sock: false
 zsh_users:
-  - root
+  - "root"

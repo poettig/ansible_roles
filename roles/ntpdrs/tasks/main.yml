@@ -13,7 +13,7 @@
   ansible.builtin.template:
     src: "ntp.toml.j2"
     dest: "/etc/ntpd-rs/ntp.toml"
-    mode: 0644
+    mode: "0644"
     validate: "ntp-ctl validate -c %s"
   notify: "Restart ntpd-rs"
 

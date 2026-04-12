@@ -1,5 +1,5 @@
 ---
 
 fail2ban_package_names:
-  - fail2ban
-  - python3-systemd
+  - "fail2ban"
+  - "python3-systemd"

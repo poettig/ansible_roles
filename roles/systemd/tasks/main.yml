@@ -53,13 +53,13 @@
   ansible.builtin.file:
     path: "{{ systemd_base_directory }}"
     state: directory
-    mode: 0755
+    mode: "0755"
 
 - name: "Deploy systemd service file"
   ansible.builtin.template:
     src: "systemd-service.j2"
     dest: "{{ systemd_base_directory }}/{{ systemd_name }}.service"
-    mode: 0644
+    mode: "0644"
   register: systemd_service_file_deploy
 
 - name: "Notify restart service if it is not oneshot and there is no timer for it, but only if the service file changed"
@@ -88,7 +88,7 @@
   ansible.builtin.template:
     src: "systemd-timer.j2"
     dest: "{{ systemd_base_directory }}/{{ systemd_name }}.timer"
-    mode: 0644
+    mode: "0644"
   when: systemd_timer_options is defined
 
 - name: "Reload systemd config"

@@ -1,4 +1,4 @@
 ---
 
 backup_borg_system_dependencies:
-  - fuse3
+  - "fuse3"

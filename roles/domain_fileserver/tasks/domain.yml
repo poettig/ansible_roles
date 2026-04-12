@@ -6,7 +6,7 @@
     state: directory
     owner: "caddy"
     group: "caddy"
-    mode: 0750
+    mode: "0750"
 
 - name: "Create .well-known directory"
   ansible.builtin.file:
@@ -14,7 +14,7 @@
     state: directory
     owner: "caddy"
     group: "caddy"
-    mode: 0750
+    mode: "0750"
 
 - name: "Create security.txt"
   ansible.builtin.copy:
@@ -26,7 +26,7 @@
       Canonical: https://{{ item.domain }}/.well-known/security.txt
     owner: "caddy"
     group: "caddy"
-    mode: 0640
+    mode: "0640"
 
 - name: "Add site config to caddy"
   ansible.builtin.include_role:

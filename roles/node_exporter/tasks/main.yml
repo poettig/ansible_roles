@@ -3,8 +3,8 @@
 - name: "Install prometheus-node-exporter and additional collectors"
   ansible.builtin.apt:
     name:
-      - prometheus-node-exporter
-      - prometheus-node-exporter-collectors
+      - "prometheus-node-exporter"
+      - "prometheus-node-exporter-collectors"
     state: present
   notify: "Restart node-exporter"
 
@@ -13,7 +13,7 @@
     path: "/etc/default/prometheus-node-exporter"
     regexp: "^ARGS=.*$"
     line: "ARGS=\"{{ node_exporter_args | join(' ') }}\""
-    mode: 0644
+    mode: "0644"
   notify: "Restart node-exporter"
   ignore_errors: "{{ ansible_check_mode }}"
 

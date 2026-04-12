@@ -3,5 +3,5 @@
 - name: "Install chezmoi"
   ansible.builtin.package:
     name:
-      - chezmoi
-      - age
+      - "chezmoi"
+      - "age"
