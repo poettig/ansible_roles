@@ -1,8 +1,0 @@
----
-
-- name: "Create authorized_keys entries allowing ssh access to the specific user"
-  ansible.posix.authorized_key:
-    user: "{{ ssh_system_user.user }}"
-    state: present
-    key: "{{ item }}"
-  loop: "{{ ssh_keys[ssh_key_owner] }}"

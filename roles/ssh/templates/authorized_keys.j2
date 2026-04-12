@@ -1,0 +1,2 @@
+# Ansible Managed file
+{{ item.keys_from | map('extract', ssh_keys) | flatten | join('\n') }}

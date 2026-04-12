@@ -17,14 +17,11 @@
   with_fileglob: "templates/sshd_config.d/*.j2"
   notify: "Restart sshd"
 
-- name: "Create authorized_keys entries allowing ssh access to the specific user"
-  ansible.posix.authorized_key:
-    user: "{{ item.user }}"
-    key: "{{ item.keys_from | map('extract', ssh_keys) | flatten | join('\n') }}"
-    state: present
+- name: "Create authorized_keys for each requested user"
+  ansible.builtin.include_tasks: per_system_user.yml
   loop: "{{ ssh_users }}"
   loop_control:
-    label: "target user: {{ item.user }}, allowed persons: {{ item.keys_from | join(', ') }}"
+    label: "{{ item.user }}"
 
 - name: "Enable openssh-server"
   ansible.builtin.systemd_service:

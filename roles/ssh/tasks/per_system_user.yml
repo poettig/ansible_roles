@@ -1,19 +1,21 @@
 ---
 
-- name: "Discover user home for {{ ssh_system_user.user }}"
+- name: "Discover user home for {{ item.user }}"
   ansible.builtin.user:
-    name: "{{ ssh_system_user.user }}"
+    name: "{{ item.user }}"
   register: ssh_system_user_info
 
-- name: "Create .ssh directory for {{ ssh_system_user.user }}"
+- name: "Create .ssh directory for {{ item.user }}"
   ansible.builtin.file:
     path: "{{ ssh_system_user_info.home }}/.ssh"
-    owner: "{{ ssh_system_user.user }}"
-    group: "{{ ssh_system_user.user }}"
-    mode: 0700
+    owner: "{{ ssh_system_user_info.uid }}"
+    group: "{{ ssh_system_user_info.group }}"
+    mode: "0700"
 
-- name: "Create authorized_keys entries allowing access for each user"
-  ansible.builtin.include_tasks: per_allowed_user.yml
-  loop: "{{ ssh_system_user.keys_from }}"
-  loop_control:
-    loop_var: ssh_key_owner
+- name: "Create authorized_keys entries allowing ssh access to the specific user"
+  ansible.builtin.template:
+    src: "authorized_keys.j2"
+    dest: "{{ ssh_system_user_info.home }}/.ssh/authorized_keys"
+    owner: "{{ ssh_system_user_info.uid }}"
+    group: "{{ ssh_system_user_info.group }}"
+    mode: "0600"
