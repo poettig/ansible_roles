@@ -4,25 +4,10 @@
   ansible.builtin.package:
     name: "yay"
 
-- name: "Create special non-root user for yay installations"
-  ansible.builtin.user:
-    name: "yay"
-    create_home: true
-    group: "wheel"
-  register: packages_yay_user_info
-
-- name: "Allow the user to run `sudo pacman` without a password"
-  community.general.sudoers:
-    name: "install-yay"
-    state: present
-    user: "{{ packages_yay_user_info.name }}"
-    nopassword: true
-    commands: "/usr/bin/pacman"
-
 - name: "Install useful packages on ArchLinux"
   become: true
-  become_user: "{{ packages_yay_user_info.name }}"
+  become_user: "{{ packages_aur_user }}"
   kewlfft.aur.aur:
-    name: "{{ packages_merged_list }}"
     use: "yay"
+    name: "{{ packages_merged_list }}"
   ignore_errors: "{{ ansible_check_mode }}"
