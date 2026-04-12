@@ -35,8 +35,10 @@ security {
 {% if "enable_static_users" in authentication_portal and authentication_portal.enable_static_users %}
         enable identity store staticusers
 {% endif %}
-        cookie domain {{ authentication_portal.cookie_domain }}
+        cookie domain {{ authentication_portal.domain }}
         cookie samesite lax
+
+        trust login redirect uri domain suffix {{ authentication_portal.domain }} path prefix /
 
         ui {
 {% if "ui_logo_url" in authentication_portal %}
