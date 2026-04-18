@@ -8,7 +8,7 @@
 - name: "Create user caddy"
   ansible.builtin.user:
     name: "{{ caddy_user_name }}"
-    shell: "/usr/bin/nologin"
+    shell: "/usr/sbin/nologin"
   register: caddy_user_info
 
 - name: "Prepare executables directory variable"

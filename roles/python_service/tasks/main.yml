@@ -19,7 +19,7 @@
   ansible.builtin.user:
     name: "{{ python_service_name }}"
     create_home: false
-    shell: "/usr/bin/nologin"
+    shell: "/usr/sbin/nologin"
   register: python_service_user_info
 
 - name: "Ensure that the state directory of the service exists"

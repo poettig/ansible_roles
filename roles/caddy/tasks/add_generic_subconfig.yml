@@ -3,7 +3,7 @@
 - name: "Get caddy user info"
   ansible.builtin.user:
     name: "{{ caddy_user_name }}"
-    shell: "/usr/bin/nologin"
+    shell: "/usr/sbin/nologin"
   register: caddy_user_info
 
 - name: "Create caddy subconfig directory /etc/caddy/{{ caddy_generic_subconfig.directory }}"
