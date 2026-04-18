@@ -7,7 +7,7 @@
 
 - name: "Add caddy security global config to caddy"
   ansible.builtin.include_role:
-    name: "poettig.roles.caddy"
+    name: poettig.roles.caddy
     tasks_from: add_global_directive_config.yml
   vars:
     caddy_global_directive_config:

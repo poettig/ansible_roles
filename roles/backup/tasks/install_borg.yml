@@ -17,7 +17,7 @@
 
 - name: "Install borg for user {{ backup_borg_install_user }}"
   ansible.builtin.include_role:
-    name: "poettig.roles.pipx_install"
+    name: poettig.roles.pipx_install
   vars:
     pipx_install_packages:
       - borgbackup[pyfuse3]

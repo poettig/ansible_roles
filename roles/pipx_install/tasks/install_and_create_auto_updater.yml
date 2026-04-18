@@ -21,7 +21,7 @@
 
 - name: "Create auto updater entry for package"
   ansible.builtin.include_role:
-    name: "poettig.roles.systemd"
+    name: poettig.roles.systemd
   vars:
     systemd_name: "pipx-upgrade-{{ pipx_install_package_name_for_service }}-{{ pipx_install_user }}"
     systemd_service_description: "Regularly upgrade {{ pipx_install_package }} via pipx"

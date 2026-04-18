@@ -15,7 +15,7 @@
 
 - name: "Create venv for mail2notify"
   ansible.builtin.include_role:
-    name: "poettig.roles.python_venv"
+    name: poettig.roles.python_venv
   vars:
     python_venv_directory: "/var/lib/mail2notify/venv"
     python_venv_modules:

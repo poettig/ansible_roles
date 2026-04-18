@@ -206,7 +206,7 @@
 
 - name: "Install systemd service"
   ansible.builtin.include_role:
-    name: "systemd"
+    name: systemd
   vars:
     systemd_name: "{{ python_service_name }}"
     systemd_service_description: "{{ python_service_description }}"

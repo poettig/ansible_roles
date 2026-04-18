@@ -59,7 +59,7 @@
 
 - name: "Setup timed systemd backup job"
   ansible.builtin.include_role:
-    name: "poettig.roles.systemd"
+    name: poettig.roles.systemd
   vars:
     systemd_name: "backup"
     systemd_script_template_name: "{{ backup_script_template_name }}"

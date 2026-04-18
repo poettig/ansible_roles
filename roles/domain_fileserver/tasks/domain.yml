@@ -30,7 +30,7 @@
 
 - name: "Add site config to caddy"
   ansible.builtin.include_role:
-    name: "poettig.roles.caddy"
+    name: poettig.roles.caddy
     tasks_from: add_site_config.yml
   vars:
     caddy_site_config:

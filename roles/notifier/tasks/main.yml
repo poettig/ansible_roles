@@ -12,7 +12,7 @@
 
 - name: "Create venv for notifier"
   ansible.builtin.include_role:
-    name: "poettig.roles.python_venv"
+    name: poettig.roles.python_venv
   vars:
     python_venv_directory: "/var/lib/matrix-notifier/venv"
     python_venv_modules: "{{ lookup('file', 'requirements-notifier.txt') | split('\n') }}"
@@ -42,7 +42,7 @@
 
 - name: "Install matrix-gateway"
   ansible.builtin.include_role:
-    name: "poettig.roles.python_service"
+    name: poettig.roles.python_service
   vars:
     python_service_name: "matrix-gateway"
     python_service_description: "A gateway to matrix via REST API"

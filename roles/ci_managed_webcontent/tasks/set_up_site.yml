@@ -6,6 +6,12 @@
     shell: "/usr/bin/nologin"
   register: ci_managed_webcontent_user_info
 
+- name: "Ensure that home directory is traversible for anyone"
+  ansible.builtin.file:
+    path: "{{ ci_managed_webcontent_user_info.home }}"
+    state: directory
+    mode: "0755"
+
 - name: "Create .ssh directory"
   ansible.builtin.file:
     path: "{{ ci_managed_webcontent_user_info.home }}/.ssh"
@@ -43,8 +49,8 @@
 
 - name: "Add site config to caddy"
   ansible.builtin.include_role:
-    name: "poettig.roles.caddy"
-    tasks_from: "add_site_config.yml"
+    name: poettig.roles.caddy
+    tasks_from: add_site_config.yml
   vars:
     caddy_site_config:
       template: "{{ ci_managed_webcontent_site.caddy_site_config_template }}"
@@ -52,7 +58,7 @@
 
 - name: "Deploy webcontent via GitHub action"
   ansible.builtin.include_role:
-    name: "poettig.roles.github_deploy_action"
+    name: poettig.roles.github_deploy_action
   vars:
     github_deploy_action_sentinel_file: "{{ ci_managed_webcontent_site.deploy_sentinel_file }}"
     github_deploy_action_repo_path: "{{ ci_managed_webcontent_site.github_repo_path }}"
