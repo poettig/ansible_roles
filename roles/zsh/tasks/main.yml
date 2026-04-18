@@ -19,4 +19,4 @@
 
 - name: "Configure zsh for each requested user"
   ansible.builtin.include_tasks: for_each_user.yml
-  loop: "{{ zsh_users }}"
+  loop: "{{ lookup('community.general.merge_variables', 'zsh_users', pattern_type='prefix') }}"
