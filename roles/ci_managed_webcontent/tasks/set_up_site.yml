@@ -3,7 +3,7 @@
 - name: "Create user for website"
   ansible.builtin.user:
     name: "{{ ci_managed_webcontent_site.user }}"
-    shell: "/usr/bin/nologin"
+    shell: "/usr/bin/bash"
   register: ci_managed_webcontent_user_info
 
 - name: "Ensure that home directory is traversible for anyone"
@@ -33,7 +33,7 @@
 - name: "Set authorized_keys of webcontent user"
   ansible.builtin.copy:
     content: |
-      command="{% if 'allowed_commands_script_template' in ci_managed_webcontent_site %}{{ ci_managed_webcontent_user_info.home }}/.ssh/allowed-commands.sh{% else %}/usr/bin/rrsync -wo {{ ci_managed_webcontent_user_info.home }}/www/{% endif %}",restrict {{ ci_managed_webcontent_site.ssh_deploy_public_key }}
+      command="{% if 'allowed_commands_script_template' in ci_managed_webcontent_site %}{{ ci_managed_webcontent_user_info.home }}/.ssh/allowed-commands.sh{% else %}/usr/bin/rrsync -wo {{ ci_managed_webcontent_user_info.home }}/www/{% endif %}",restrict {{ ci_managed_webcontent_site.deploy_ssh_public_key }}
     dest: "{{ ci_managed_webcontent_user_info.home }}/.ssh/authorized_keys"
     owner: "{{ ci_managed_webcontent_user_info.uid }}"
     group: "{{ ci_managed_webcontent_user_info.group }}"
@@ -54,15 +54,15 @@
   vars:
     caddy_site_config:
       template: "{{ ci_managed_webcontent_site.caddy_site_config_template }}"
-      target_filename: "{{ ci_managed_webcontent_site.fqdn }}"
+      target_filename: "{{ ci_managed_webcontent_site.fqdn }}.conf"
 
 - name: "Deploy webcontent via GitHub action"
   ansible.builtin.include_role:
     name: poettig.roles.github_deploy_action
   vars:
-    github_deploy_action_sentinel_file: "{{ ci_managed_webcontent_site.deploy_sentinel_file }}"
-    github_deploy_action_repo_path: "{{ ci_managed_webcontent_site.github_repo_path }}"
-    github_deploy_action_access_token: "{{ ci_managed_webcontent_site.deploy_repo_access_token }}"
+    github_deploy_action_sentinel_file: "{{ ci_managed_webcontent_user_info.home }}/www/{{ ci_managed_webcontent_site.deploy_sentinel_file }}"
+    github_deploy_action_repo_path: "{{ ci_managed_webcontent_site.deploy_github_repo_path }}"
+    github_deploy_action_access_token: "{{ ci_managed_webcontent_site.deploy_github_repo_access_token }}"
     github_deploy_action_body:
       event_type: "ansible-{{ ci_managed_webcontent_site.deploy_environment }}"
       client_payload:
