@@ -6,3 +6,7 @@
   loop_control:
     loop_var: "ci_managed_webcontent_site"
     label: "{{ ci_managed_webcontent_site.fqdn }}"
+  when: |
+    (ansible_run_tags | select('search', 'ci_managed_webcontent_skip_') | length == 0 and ansible_run_tags | select('search', 'ci_managed_webcontent_only_') | length == 0)
+    or (ansible_run_tags | select('search', 'ci_managed_webcontent_skip_') | length > 0 and ('ci_managed_webcontent_skip_' ~ (ci_managed_webcontent_site.fqdn | replace('.', '_'))) not in ansible_run_tags)
+    or (ansible_run_tags | select('search', 'ci_managed_webcontent_only_') | length > 0 and ('ci_managed_webcontent_only_' ~ (ci_managed_webcontent_site.fqdn | replace('.', '_'))) in ansible_run_tags)
