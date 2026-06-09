@@ -30,7 +30,7 @@ security {
 {% for authentication_portal in caddy_security_authentication_portals %}
     authentication portal {{ authentication_portal.name }} {
         crypto default token lifetime {{ authentication_portal.token_lifetime }}
-        crypto key sign-verify {{ caddy_security_jwt_key }}
+        crypto key sign-verify {{ authentication_portal.jwt_key }}
         enable identity provider {{ authentication_portal.identity_provider }}
 {% if "enable_static_users" in authentication_portal and authentication_portal.enable_static_users %}
         enable identity store staticusers
@@ -94,7 +94,7 @@ security {
     authorization policy {{ authorization_policy.name }} {
         set auth url {{ authorization_policy.url }}
         set access_token cookie name AUTHP_ACCESS_TOKEN
-        crypto key verify {{ caddy_security_jwt_key }}
+        crypto key verify {{ authorization_policy.jwt_key }}
 {% if authorization_policy.allowed_roles is defined %}
         allow roles {{ authorization_policy.allowed_roles + [authorization_policy.name] | join(" ") }}
 {% else %}
