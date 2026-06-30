@@ -71,7 +71,7 @@
     - systemd_service_option is not defined or 'Type' not in systemd_service_options or systemd_service_options.Type != 'oneshot'
     - systemd_service_file_deploy.changed
     - systemd_service_restart
-  notify: "{{ systemd_notify_handler_name | default(None) or ('Restart ' + systemd_name) }}"
+  notify: "{{ (systemd_notify_handler_name | default(None)) or 'Restart the service' }}"
 
 - name: "Start systemd service if not oneshot and the service should be enabled"
   ansible.builtin.systemd_service:

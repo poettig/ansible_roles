@@ -1,6 +1,6 @@
 ---
 
-- name: "Restart {{ python_service_name }}"
+- name: "Restart the python service"
   ansible.builtin.systemd_service:
     name: "{{ python_service_name }}"
     state: restarted
