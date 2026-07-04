@@ -78,5 +78,5 @@
   ansible.builtin.copy:
     src: "borg_compact.sh"
     dest: "/usr/local/bin/borg-compact"
-    mode: "0700"
+    mode: "0755"
   when: backup_install_borg_compact

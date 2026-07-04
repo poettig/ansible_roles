@@ -21,13 +21,6 @@
   ignore_errors: "{{ ansible_check_mode }}"
   loop: "{{ backup_full_access_keys_from | map('extract', ssh_keys) | flatten }}"
 
-# Necessary for borg_compact.sh script
-- name: "Allow BORGPP env var to be forwarded"
-  ansible.builtin.copy:
-    src: "accept_borgpp.conf"
-    dest: "/etc/ssh/sshd_config.d/accept_borgpp.conf"
-    mode: "0644"
-
 - name: "Create repo for each backup client"
   ansible.builtin.include_tasks: create_backup_repo_on_backup_target.yml
   loop: "{{ backup_client_hosts }}"

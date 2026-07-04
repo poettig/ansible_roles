@@ -1,29 +1,24 @@
 #!/usr/bin/env bash
 
-cleanup() {
-	# Delete password file
-	rm "$pwfile" || echo "FAILED TO DELETE $pwfile, DO SO IMMEDIATELY MANUALLY!"
-
-	# Reset trap
-	trap - EXIT INT TERM
-}
-
-cleanup_and_exit() {
-	cleanup
-	exit
+show_help_and_exit() {
+	echo "borg-compact -f <system-to-run-compaction-from> -r <repo-to-compact>"
+	echo "  Without -f, compaction is run from the local system"
+	echo "  Without -r, all repositories are compacted"
+	exit 0
 }
 
 ssh_or_no_ssh() {
 	local mode="$1"
 	local borg_path="$2"
 	local ssh_target="$3"
-	shift 3
+	local password="$4"
+	shift 4
 
 	if [ "$mode" = "ssh" ]; then
 		# shellcheck disable=SC2154
 		# (defined via tmux variable declaration)
 		# -q for silence, -t for tty allocation - without it, SIGINT will not terminate the remote command
-		time BORGPP="$password" ssh -qt -o SendEnv=BORGPP "$ssh_target" BORG_PASSPHRASE='$BORGPP' "$borg_path" "$@"
+		echo "$password" | time ssh -Aqt "$ssh_target" "export BORG_PASSPHRASE=\$(cat); $borg_path $*"
 	elif [ "$mode" = "direct" ]; then
 		time BORG_PASSPHRASE="$password" borg "$@"
 	else
@@ -35,22 +30,23 @@ ssh_or_no_ssh() {
 run_compact() {
 	local compact_mode=$(echo "$1" | jq -r '.mode')
 	local compact_name=$(echo "$1" | jq -r '.name')
-	local compact_borg_path=$(echo "$1" | jq -r '.borg_path')
+	local compact_borg_path=$(echo "$1" | jq -r '.borg_path // "borg"')
 	local compact_ssh_target=$(echo "$1" | jq -r '.ssh_target')
 	local compact_repo_path=$(echo "$1" | jq -r '.repo_path')
+	local password=$(eval "$(echo "$1" | jq -r '.getpass_cmd')")
 
-	if [ "$compact_ssh_target" = "null" ]; then
-			local compact_location="$compact_repo_path"
-	else
-			local compact_location="$compact_ssh_target:$compact_repo_path"
+	if [ "$compact_mode" = "direct" ] && [ -n "$system_to_run_on" ]; then
+		# Change mode if the command should run on a remote system
+		compact_mode="ssh"
+		compact_ssh_target="$system_to_run_on"
 	fi
 
-	echo "Compacting $compact_name at $compact_location..."
+	echo "Compacting $compact_name..."
 	echo "======================================"
 	echo
 
     echo "1. Get initial repo size"
-    if ! ssh_or_no_ssh "$compact_mode" "$compact_borg_path" "$compact_ssh_target" info "$compact_repo_path"; then
+    if ! ssh_or_no_ssh "$compact_mode" "$compact_borg_path" "$compact_ssh_target" "$password" info "$compact_repo_path"; then
 		echo "ERROR: Failed to get repo information."
 		echo
 		echo
@@ -59,10 +55,10 @@ run_compact() {
     echo
 
 	echo "2. Check integrity"
-	if ! ssh_or_no_ssh "$compact_mode" "$compact_borg_path" "$compact_ssh_target" -vp check --verify-data "$compact_repo_path"; then
+	if ! ssh_or_no_ssh "$compact_mode" "$compact_borg_path" "$compact_ssh_target" "$password" -vp check --verify-data "$compact_repo_path"; then
 		echo "ERROR: Failed integrity check. Trying repair, CTRL+C to cancel..."
 		echo
-		if ! ssh_or_no_ssh "$compact_mode" "$compact_borg_path" "$compact_ssh_target" -vp check --repair --verify-data "$compact_repo_path"; then
+		if ! ssh_or_no_ssh "$compact_mode" "$compact_borg_path" "$compact_ssh_target" "$password" -vp check --repair --verify-data "$compact_repo_path"; then
 			echo "CRITICAL: Failed repair."
 			echo
 			echo
@@ -72,7 +68,7 @@ run_compact() {
 	echo
 
 	echo "3. Compact"
-	ssh_or_no_ssh "$compact_mode" "$compact_borg_path" "$compact_ssh_target" -vp compact "$compact_repo_path"
+	ssh_or_no_ssh "$compact_mode" "$compact_borg_path" "$compact_ssh_target" "$password" -vp compact "$compact_repo_path"
 	echo
 
 	echo
@@ -118,43 +114,48 @@ if tmux has-session -t compact 2> /dev/null; then
 	exit 1
 fi
 
-# Ask for all passwords
-declare -a pass_cmds
-for config in "${configs[@]}"; do
-	pass_cmds+=("$(echo "$config" | jq -r '.getpass_cmd')")
+# Process args
+while getopts "hf:r:" opt; do
+	case "$opt" in
+		h)
+			show_help_and_exit
+			;;
+		f)
+			system_to_run_on="$OPTARG"
+			;;
+		r)
+			repo_name="$OPTARG"
+			;;
+		*)
+			show_help_and_exit
+			;;
+	esac
 done
-
-pwfile=$(mktemp)
-trap cleanup_and_exit EXIT INT TERM
-echo "Please put the result of the following list of commands into the file $pwfile."
-printf "%s\n" "${pass_cmds[@]}"
-# shellcheck disable=SC2162
-read -p "Press enter to continue."
 
 # Run compaction sequence
 for i in "${!configs[@]}"; do
-        compact_name=$(echo "${configs[$i]}" | jq -r '.name')
+	compact_name=$(echo "${configs[$i]}" | jq -r '.name')
 
-        # Skip if not the selected compaction
-        if [ -n "$1" ] && ! [ "$compact_name" = "$1" ]; then
-                continue
-        fi
+	# Skip if not the selected compaction
+	if [ -n "$repo_name" ] && ! [ "$compact_name" = "$repo_name" ]; then
+		continue
+	fi
 
-        if tmux has-session -t compact 2> /dev/null; then
-			tmux new-window -t compact -n "$compact_name"
-        else
-			tmux new-session -d -s compact -n "$compact_name"
-        fi
+	if tmux has-session -t compact 2> /dev/null; then
+		tmux new-window -t compact -n "$compact_name"
+	else
+		tmux new-session -d -s compact -n "$compact_name"
+	fi
 
-        tmux send-keys "unset HISTFILE" Enter
-        tmux send-keys "password=\$(sed \"$((i+1))q;d\" $pwfile)" Enter
-        tmux send-keys "source $SCRIPTPATH/$(basename "$0") --source" Enter
-        tmux send-keys "run_compact '${configs[$i]}'" Enter
+	tmux send-keys "unset HISTFILE" Enter
+	tmux send-keys "source $SCRIPTPATH/$(basename "$0") --source" Enter
+	tmux send-keys "export system_to_run_on=$system_to_run_on" Enter
+	tmux send-keys "run_compact '${configs[$i]}'" Enter
+
+	if [ -n "$repo_name" ]; then
+		break
+	fi
 done
-
-# Clean up password file after a short delay (tmux sometimes takes a bit to complete processing key inputs)
-sleep 5
-cleanup
 
 if ! tmux has-session -t compact 2> /dev/null; then
 	echo No compaction session started. Did you try to select a nonexistent compaction?
