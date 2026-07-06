@@ -5,10 +5,9 @@
     file: "{{ ansible_facts['distribution'] | lower }}.yml"
   failed_when: false  # never fail, even if the file does not exist
 
-- name: "Install libolm"
+- name: "Install necessary system packages"
   ansible.builtin.package:
-    name:
-      - "{{ notifier_libolm_package_name }}"
+    name: "{{ notifier_required_system_packages }}"
 
 - name: "Create venv for notifier"
   ansible.builtin.include_role:

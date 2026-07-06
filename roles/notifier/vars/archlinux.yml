@@ -1,3 +1,4 @@
 ---
 
-notifier_libolm_package_name: "libolm"
+notifier_required_system_packages:
+  - "libolm"
