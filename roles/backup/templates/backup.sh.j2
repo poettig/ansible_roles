@@ -103,7 +103,7 @@ for repo in "${repos[@]}"; do
 	borg_create_output="$({{ backup_executable_path }} create "${borg_create_args[@]}" 2>&1 | tee >(cat - >&5); exit ${PIPESTATUS[0]})"
 	create_exit=$?
 
-	message_prefix="Backup from '$(hostname -f)' to '$repo' finished with "
+	message_prefix="Backup from '$(hostname -f)' to '$repo' finished with"
 	if [ ${create_exit} -eq 0 ]; then
 		print_message "Backup finished successfully"
 	elif [ ${create_exit} -eq 1 ]; then
