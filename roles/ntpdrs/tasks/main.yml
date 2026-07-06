@@ -25,9 +25,15 @@
     daemon_reload: true
   ignore_errors: "{{ ansible_check_mode }}"
 
-- name: "Ensure that systemd-timesyncd is disabled"
+# Need to seperate to not fail on first run on systems that don't have systemd-timesyncd installed
+# Turns out you can stop and disable a unit that does not actually exists as long as it is masked already
+- name: "Ensure that systemd-timesyncd is masked"
+  ansible.builtin.systemd_service:
+    name: "systemd-timesyncd"
+    masked: true
+
+- name: "Ensure that systemd-timesyncd is stopped and disabled"
   ansible.builtin.systemd_service:
     name: "systemd-timesyncd"
     state: stopped
     enabled: false
-    masked: true
