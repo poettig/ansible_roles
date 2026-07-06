@@ -12,7 +12,6 @@
   check_mode: false
 
 - name: "Init repo if the folder exists, but there is no borg repo in it"  # noqa: no-changed-when - way too complicated too change right now, maybe future-me will have the endurance
-
   ansible.builtin.command: "borg init -e repokey-blake2 {{ item }}"
   environment:
     BORG_RSH: "ssh -i ~/.ssh/backup_ed25519 -o StrictHostKeyChecking=accept-new"
@@ -23,9 +22,11 @@
 - name: "Fail in all other cases"
   ansible.builtin.fail:
     msg: >-
-      {{ item }} does not exist.
-      If the entry is on a self-hosted backup target, you might need to run
-      `ansible-playbook main.yml -t create-backup-ssh-key,create-backup-repos-on-backup-target`, then try again.
+      {{ item }} does not exist or is not accessible, check failure information.
+
+      You might need to run `ansible-playbook main.yml -t backup_target -l backup_target` first
+      in order to create a backup SSH key and set up the backup target server.
+
       Failure information: {{ backup_borg_info_result }}
   when:
     - not ansible_check_mode
