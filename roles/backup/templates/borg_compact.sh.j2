@@ -1,0 +1,146 @@
+#!/usr/bin/env bash
+
+show_help_and_exit() {
+	echo "borg-compact -f <system-to-run-compaction-from> -r <repo-to-compact>"
+	echo "  Without -f, compaction is run from the local system"
+	echo "  Without -r, all repositories are compacted"
+	exit 0
+}
+
+ssh_or_no_ssh() {
+	local mode="$1"
+	local borg_path="$2"
+	local ssh_target="$3"
+	local password="$4"
+	shift 4
+
+	if [ "$mode" = "ssh" ]; then
+		# shellcheck disable=SC2154
+		# (defined via tmux variable declaration)
+		# -q for silence, -t for tty allocation - without it, SIGINT will not terminate the remote command
+		echo "$password" | time ssh -Aqt "$ssh_target" "export BORG_PASSPHRASE=\$(cat); $borg_path $*"
+	elif [ "$mode" = "direct" ]; then
+		time BORG_PASSPHRASE="$password" borg "$@"
+	else
+		echo "Invalid mode $mode"
+		return 1
+	fi
+}
+
+run_compact() {
+	local compact_mode=$(echo "$1" | jq -r '.mode')
+	local compact_name=$(echo "$1" | jq -r '.name')
+	local compact_borg_path=$(echo "$1" | jq -r '.borg_path // "borg"')
+	local compact_ssh_target=$(echo "$1" | jq -r '.ssh_target')
+	local compact_repo_path=$(echo "$1" | jq -r '.repo_path')
+	local password=$(eval "$(echo "$1" | jq -r '.getpass_cmd')")
+
+	if [ "$compact_mode" = "direct" ] && [ -n "$system_to_run_on" ]; then
+		# Change mode if the command should run on a remote system
+		compact_mode="ssh"
+		compact_ssh_target="$system_to_run_on"
+	fi
+
+	echo "Compacting $compact_name..."
+	echo "======================================"
+	echo
+
+    echo "1. Get initial repo size"
+    if ! ssh_or_no_ssh "$compact_mode" "$compact_borg_path" "$compact_ssh_target" "$password" info "$compact_repo_path"; then
+		echo "ERROR: Failed to get repo information."
+		echo
+		echo
+		return
+	fi
+    echo
+
+	echo "2. Check integrity"
+	if ! ssh_or_no_ssh "$compact_mode" "$compact_borg_path" "$compact_ssh_target" "$password" -vp check --verify-data "$compact_repo_path"; then
+		echo "ERROR: Failed integrity check. Trying repair, CTRL+C to cancel..."
+		echo
+		if ! ssh_or_no_ssh "$compact_mode" "$compact_borg_path" "$compact_ssh_target" "$password" -vp check --repair --verify-data "$compact_repo_path"; then
+			echo "CRITICAL: Failed repair."
+			echo
+			echo
+			return
+		fi
+	fi
+	echo
+
+	echo "3. Compact"
+	ssh_or_no_ssh "$compact_mode" "$compact_borg_path" "$compact_ssh_target" "$password" -vp compact "$compact_repo_path"
+	echo
+
+	echo
+	echo
+}
+
+if [[ "$1" == "--source" ]]; then
+	return
+fi
+
+SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 || exit ; pwd -P )"
+configs=(
+	{{ backup_borg_compact_configs | map("to_json") | map("quote") | join("\n") | indent("\t") }}
+)
+
+# Check if ssh agent available
+if [ -z "$SSH_AUTH_SOCK" ]; then
+	echo "SSH agent not available, please connect with agent forwarding."
+	exit 1
+fi
+
+if tmux has-session -t compact 2> /dev/null; then
+	echo "There already is a compaction session running, please close it before running again."
+	exit 1
+fi
+
+# Process args
+while getopts "hf:r:" opt; do
+	case "$opt" in
+		h)
+			show_help_and_exit
+			;;
+		f)
+			system_to_run_on="$OPTARG"
+			;;
+		r)
+			repo_name="$OPTARG"
+			;;
+		*)
+			show_help_and_exit
+			;;
+	esac
+done
+
+# Run compaction sequence
+for i in "${!configs[@]}"; do
+	compact_name=$(echo "${configs[$i]}" | jq -r '.name')
+
+	# Skip if not the selected compaction
+	if [ -n "$repo_name" ] && ! [ "$compact_name" = "$repo_name" ]; then
+		continue
+	fi
+
+	if tmux has-session -t compact 2> /dev/null; then
+		tmux new-window -t compact -n "$compact_name"
+	else
+		tmux new-session -d -s compact -n "$compact_name"
+	fi
+
+	tmux send-keys "unset HISTFILE" Enter
+	tmux send-keys "source $SCRIPTPATH/$(basename "$0") --source" Enter
+	tmux send-keys "export system_to_run_on=$system_to_run_on" Enter
+	tmux send-keys "run_compact '${configs[$i]}'" Enter
+
+	if [ -n "$repo_name" ]; then
+		break
+	fi
+done
+
+if ! tmux has-session -t compact 2> /dev/null; then
+	echo No compaction session started. Did you try to select a nonexistent compaction?
+	exit 1
+fi
+
+tmux a -t compact

@@ -3,3 +3,4 @@
 backup_borg_system_dependencies:
   - "fuse3"
   - "libfuse3-dev"
+backup_ssh_service_name: "ssh"

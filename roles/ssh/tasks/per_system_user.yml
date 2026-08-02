@@ -13,8 +13,12 @@
     mode: "0700"
 
 - name: "Create authorized_keys entries allowing ssh access to the specific user"
-  ansible.builtin.template:
-    src: "authorized_keys.j2"
+  ansible.builtin.copy:
+    content: |
+      # Ansible Managed file
+      {% for key in item.keys_from | map('extract', ssh_keys) | flatten %}
+      {{ key }}
+      {% endfor %}
     dest: "{{ ssh_system_user_info.home }}/.ssh/authorized_keys"
     owner: "{{ ssh_system_user_info.uid }}"
     group: "{{ ssh_system_user_info.group }}"

@@ -33,6 +33,7 @@
     - name: "Create authorized_keys entries allowing append-only backup for backup client {{ item }}"
       ansible.posix.authorized_key:
         user: "backup"
+        path: "{{ backup_user_info.home }}/.ssh/authorized_keys_append_only"
         state: present
         key: "{{ backup_keypair_info.public_key }}"
         key_options: 'command="borg serve --append-only --restrict-to-repository {{ backup_repos_homedir }}/{{ item }}",restrict'

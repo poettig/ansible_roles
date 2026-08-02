@@ -14,12 +14,24 @@
     backup_borg_install_user: "{{ backup_user_info.name }}"
 
 - name: "Create authorized_keys entries allowing full access to backups"
-  ansible.posix.authorized_key:
-    user: "{{ backup_user_info.name }}"
-    state: present
-    key: "{{ item }}"
-  ignore_errors: "{{ ansible_check_mode }}"
-  loop: "{{ backup_full_access_keys_from | map('extract', ssh_keys) | flatten }}"
+  ansible.builtin.copy:
+    content: |
+      # Ansible Managed file
+      {% for key in backup_full_access_keys_from | map("extract", ssh_keys) | flatten %}
+      {{ key }}
+      {% endfor %}
+    dest: "{{ backup_user_info.home }}/.ssh/authorized_keys"
+    owner: "{{ backup_user_info.uid }}"
+    group: "{{ backup_user_info.group }}"
+    mode: "0600"
+
+- name: "Set up ssh server to also ready authorized_keys_append_only"
+  ansible.builtin.copy:
+    content:
+      AuthorizedKeysFile .ssh/authorized_keys .ssh/authorized_keys_append_only
+    dest: "/etc/ssh/sshd_config.d/authorized_keys_append_only_for_borg.conf"
+    mode: "0644"
+  notify: "Restart sshd"
 
 - name: "Create repo for each backup client"
   ansible.builtin.include_tasks: create_backup_repo_on_backup_target.yml

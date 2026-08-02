@@ -30,7 +30,7 @@
     - item in hostvars
     - "'backup_client_hosts' in hostvars[item]"
     - inventory_hostname in hostvars[item].backup_client_hosts
-  loop: "{{ groups['backup_target'] }}"
+  loop: "{{ groups['backup_targets'] }}"
 
 - name: "Check if all backup targets exist"
   ansible.builtin.include_tasks: ensure_repo_existence.yml
@@ -75,8 +75,8 @@
   when: backup_time is defined
 
 - name: "Install borg_compact.sh if requested"
-  ansible.builtin.copy:
-    src: "borg_compact.sh"
+  ansible.builtin.template:
+    src: "borg_compact.sh.j2"
     dest: "/usr/local/bin/borg-compact"
     mode: "0755"
   when: backup_install_borg_compact
