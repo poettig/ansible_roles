@@ -18,7 +18,7 @@ ssh_or_no_ssh() {
 		# shellcheck disable=SC2154
 		# (defined via tmux variable declaration)
 		# -q for silence, -t for tty allocation - without it, SIGINT will not terminate the remote command
-		echo "$password" | time ssh -Aqt "$ssh_target" "export BORG_PASSPHRASE=\$(cat); export BORG_RSH='ssh -o StrictHostKeyChecking=accept-new' $borg_path $*"
+		echo "$password" | time ssh -Aqt "$ssh_target" "export BORG_PASSPHRASE=\$(cat); export BORG_RSH='ssh -o StrictHostKeyChecking=accept-new'; $borg_path $*"
 	elif [ "$mode" = "direct" ]; then
 		time BORG_RSH="ssh -o StrictHostKeyChecking=accept-new" BORG_PASSPHRASE="$password" borg "$@"
 	else
