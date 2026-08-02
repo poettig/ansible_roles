@@ -79,4 +79,5 @@
     src: "borg_compact.sh.j2"
     dest: "/usr/local/bin/borg-compact"
     mode: "0755"
+  tags: borg-compact
   when: backup_install_borg_compact
