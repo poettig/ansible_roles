@@ -113,6 +113,11 @@ while getopts "hf:r:" opt; do
 	esac
 done
 
+# Open ssh multiplex session
+if [ -n "$system_to_run_on" ]; then
+	ssh "$system_to_run_on" true
+fi
+
 # Run compaction sequence
 for i in "${!configs[@]}"; do
 	compact_name=$(echo "${configs[$i]}" | jq -r '.name')
