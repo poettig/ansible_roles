@@ -1,3 +1,7 @@
+{% set zsh_ssh_keys = lookup('community.general.merge_variables', 'zsh_ssh_keys', pattern_type='prefix') %}
+{% set zsh_bitwarden_profiles = lookup('community.general.merge_variables', 'zsh_bitwarden_profiles', pattern_type='prefix') %}
+{% set zsh_startup_programs = lookup('community.general.merge_variables', 'zsh_startup_programs', pattern_type='prefix') %}
+{% set zsh_startup_programs_light_theme = lookup('community.general.merge_variables', 'zsh_startup_programs_light_theme', pattern_type='prefix') %}
 export ZSH="$HOME/.oh-my-zsh"
 ZSH_THEME="peet"
 
@@ -61,6 +65,31 @@ alias yay="sudo apt update && sudo apt upgrade"
 alias autoremove='sudo pacman -Rns $(pacman -Qtdq)'
 {% endif %}
 
+{% if zsh_user_info.uid != 0 %}
+# Unlock rbw
+{% for profile in zsh_bitwarden_profiles | selectattr("automatic", "defined") | selectattr("automatic") %}
+{% if profile.name != "" %}RBW_PROFILE={{ profile.name }} {% endif %}rbw unlock || exit
+{% endfor %}
+
+# Unlock ssh keys
+{% for ssh_key in zsh_ssh_keys | selectattr("automatic", "defined") | selectattr("automatic") %}
+{% if "bitwarden_password_id" in ssh_key %}
+expect -c '
+	set pass [exec rbw get "{{ ssh_key.bitwarden_password_id }}"]
+	spawn ssh-add $env(HOME)/.ssh/{{ ssh_key.filename }}
+	expect "Enter passphrase"
+	send "$pass\r"
+	expect eof
+' > /dev/null
+{% else %}
+ssh-add $HOME/.ssh/{{ ssh_key.filename }}
+{% endif %}
+{% endfor %}
+
+# Unlock sudo
+rbw get {{ zsh_sudo_password_bitwarden_id }} | sudo -S true > /dev/null 2>&1
+
+{% endif %}
 function mkcd() {
 	mkdir -p $1
 	cd $1
@@ -76,6 +105,72 @@ acp() {
 	git push
 }
 
+{% if zsh_user_info.uid != 0 %}
+{% for profile in zsh_bitwarden_profiles | json_query("[?automatic==`false` || automatic==`null`]") %}
+unlock_{{ profile.name }}() {
+	{% if profile.name != "" %}RBW_PROFILE={{ profile.name }} {% endif %}rbw unlock || exit
+{% for ssh_key in zsh_ssh_keys | json_query("[?automatic==`false` || automatic==`null`]") | selectattr("bitwarden_profile", "equalto", profile.name) %}
+{% if "bitwarden_password_id" in ssh_key %}
+	expect -c '
+		set env(RBW_PROFILE) "{{ ssh_key.bitwarden_profile }}"
+		set pass [exec rbw get "{{ ssh_key.bitwarden_password_id }}"]
+		spawn ssh-add $env(HOME)/.ssh/{{ ssh_key.filename }}
+		expect "Enter passphrase"
+		send "$pass\r"
+		expect eof
+	' > /dev/null
+{% else %}
+	ssh-add $HOME/.ssh/{{ ssh_key.filename }}
+{% endif %}
+{% endfor %}
+}
+
+{% endfor %}
+run_program_if_not_running() {
+	if [ $# -gt 1 ]; then
+		progname="$1"
+		shift
+		cmd="$@"
+	else
+		progname="$1"
+		cmd="$1"
+	fi
+
+	# Get process list first to not have "rg $progname" in it
+	processes=$(ps -eo args)
+	if echo "$processes" | rg "^.*?$progname( |$)" > /dev/null; then
+		echo "$progname is already running."
+		return
+	fi
+
+	echo -n "Launching $progname using command $cmd..."
+	# Run program and disown immediately (&!)
+	# Do this in a subshell to not have the job notification printed
+	($cmd > /dev/null 2>&1 &!)
+	echo " Done."
+}
+
+{% if (zsh_startup_programs is defined and zsh_startup_programs) or (zsh_startup_programs_light_theme is defined and zsh_startup_programs_light_theme) %}
+# startup
+startup() {
+{% if zsh_startup_programs is defined and zsh_startup_programs %}
+{% for prog in zsh_startup_programs %}
+	run_program_if_not_running {{ prog }}
+{% endfor %}
+{% endif %}
+{% if zsh_startup_programs_light_theme is defined and zsh_startup_programs_light_theme %}
+
+	export GTK_THEME={{ zsh_startup_light_theme_name }}
+{% for prog in zsh_startup_programs_light_theme %}
+	run_program_if_not_running {{ prog }}
+{% endfor %}
+	unset GTK_THEME
+{% endif %}
+	exit
+}
+
+{% endif %}
+{% endif %}
 # Caddy logging helpers
 function caddy_log_internal() {
 	LOG_PATH=/var/log/caddy/"$1".log
