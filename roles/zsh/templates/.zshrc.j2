@@ -76,13 +76,13 @@ alias autoremove='sudo pacman -Rns $(pacman -Qtdq)'
 {% if "bitwarden_password_id" in ssh_key %}
 expect -c '
 	set pass [exec rbw get "{{ ssh_key.bitwarden_password_id }}"]
-	spawn ssh-add $env(HOME)/.ssh/{{ ssh_key.filename }}
+	spawn ssh-add -q $env(HOME)/.ssh/{{ ssh_key.filename }}
 	expect "Enter passphrase"
 	send "$pass\r"
 	expect eof
 ' > /dev/null
 {% else %}
-ssh-add $HOME/.ssh/{{ ssh_key.filename }}
+ssh-add -q $HOME/.ssh/{{ ssh_key.filename }}
 {% endif %}
 {% endfor %}
 
