@@ -121,10 +121,16 @@ fi
 # Run compaction sequence
 for i in "${!configs[@]}"; do
 	compact_name=$(echo "${configs[$i]}" | jq -r '.name')
+	compact_ssh_target=$(echo "${configs[$i]}" | jq -r '.ssh_target')
 
 	# Skip if not the selected compaction
 	if [ -n "$repo_name" ] && ! [ "$compact_name" = "$repo_name" ]; then
 		continue
+	fi
+
+	# Open ssh multiplex session to ssh target
+	if [ "$compact_ssh_target" != "null" ]; then
+		ssh "$compact_ssh_target" true
 	fi
 
 	if tmux has-session -t compact 2> /dev/null; then
