@@ -66,26 +66,6 @@ alias autoremove='sudo pacman -Rns $(pacman -Qtdq)'
 {% endif %}
 
 {% if zsh_user_info.uid != 0 %}
-# Unlock rbw
-{% for profile in zsh_bitwarden_profiles | selectattr("automatic", "defined") | selectattr("automatic") %}
-{% if profile.name != "" %}RBW_PROFILE={{ profile.name }} {% endif %}rbw unlock || exit
-{% endfor %}
-
-# Unlock ssh keys
-{% for ssh_key in zsh_ssh_keys | selectattr("automatic", "defined") | selectattr("automatic") %}
-{% if "bitwarden_password_id" in ssh_key %}
-expect -c '
-	set pass [exec rbw get "{{ ssh_key.bitwarden_password_id }}"]
-	spawn ssh-add -q $env(HOME)/.ssh/{{ ssh_key.filename }}
-	expect "Enter passphrase"
-	send "$pass\r"
-	expect eof
-' > /dev/null
-{% else %}
-ssh-add -q $HOME/.ssh/{{ ssh_key.filename }}
-{% endif %}
-{% endfor %}
-
 # Unlock sudo
 rbw get {{ zsh_sudo_password_bitwarden_id }} | sudo -S true > /dev/null 2>&1
 
@@ -106,26 +86,29 @@ acp() {
 }
 
 {% if zsh_user_info.uid != 0 %}
-{% for profile in zsh_bitwarden_profiles | json_query("[?automatic==`false` || automatic==`null`]") %}
-unlock_{{ profile.name }}() {
+{% for profile in zsh_bitwarden_profiles %}
+unlock{% if profile.name %}_{{ profile.name }}{% endif %}() {
 	{% if profile.name != "" %}RBW_PROFILE={{ profile.name }} {% endif %}rbw unlock || exit
-{% for ssh_key in zsh_ssh_keys | json_query("[?automatic==`false` || automatic==`null`]") | selectattr("bitwarden_profile", "equalto", profile.name) %}
+{% for ssh_key in zsh_ssh_keys if ssh_key.bitwarden_profile | default("") == profile.name %}
 {% if "bitwarden_password_id" in ssh_key %}
 	expect -c '
+{% if "bitwarden_profile" in ssh_key and ssh_key.bitwarden_profile != "" %}
 		set env(RBW_PROFILE) "{{ ssh_key.bitwarden_profile }}"
+{% endif %}
 		set pass [exec rbw get "{{ ssh_key.bitwarden_password_id }}"]
-		spawn ssh-add $env(HOME)/.ssh/{{ ssh_key.filename }}
+		spawn ssh-add -q $env(HOME)/.ssh/{{ ssh_key.filename }}
 		expect "Enter passphrase"
 		send "$pass\r"
 		expect eof
 	' > /dev/null
 {% else %}
-	ssh-add $HOME/.ssh/{{ ssh_key.filename }}
+	ssh-add -q $HOME/.ssh/{{ ssh_key.filename }}
 {% endif %}
 {% endfor %}
 }
 
 {% endfor %}
+{% if (zsh_startup_programs is defined and zsh_startup_programs) or (zsh_startup_programs_light_theme is defined and zsh_startup_programs_light_theme) %}
 run_program_if_not_running() {
 	if [ $# -gt 1 ]; then
 		progname="$1"
@@ -143,14 +126,13 @@ run_program_if_not_running() {
 		return
 	fi
 
-	echo -n "Launching $progname using command $cmd..."
 	# Run program and disown immediately (&!)
 	# Do this in a subshell to not have the job notification printed
+	echo -n "Launching $progname using command $cmd..."
 	($cmd > /dev/null 2>&1 &!)
 	echo " Done."
 }
 
-{% if (zsh_startup_programs is defined and zsh_startup_programs) or (zsh_startup_programs_light_theme is defined and zsh_startup_programs_light_theme) %}
 # startup
 startup() {
 {% if zsh_startup_programs is defined and zsh_startup_programs %}
