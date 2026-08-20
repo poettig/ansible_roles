@@ -27,4 +27,4 @@ $(journalctl -q --no-hostname _SYSTEMD_INVOCATION_ID="$InvocationID" | tail -c 1
 EOF
 
 # `jq -Rsa .` converts the message into a json-compatible value including quotes around it
-echo -n "{\"message\": $(echo "$message" | jq -Rsa .), \"rooms\": [\"peet\"]}" | curl -s -X POST http://localhost:3578/send-markdown -H "Content-Type: application/json" --output /dev/null --data-binary @-
+echo -n "{\"message\": $(echo "$message" | jq -Rsa .), \"rooms\": [\"peet\"]}" | curl --retry 10 -s -X POST http://localhost:3578/send-markdown -H "Content-Type: application/json" --output /dev/null --data-binary @-
