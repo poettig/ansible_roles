@@ -28,6 +28,8 @@
           environment_file_path: "{{ vaultwarden_user_info.home }}/.env"
           environment:
             ROCKET_PORT: 8080
+            IP_HEADER: "X-Forwarded-For"
+            IP_HEADER_TRUSTED_PROXIES: "{{ vaultwarden_trusted_proxies | join(',') }}"
             ADMIN_TOKEN: "{{ vaultwarden_admin_token | domrim.general.password_hash_argon2(salt=((2**128) | random(seed=inventory_hostname) | string), time_cost=3, parallelism=4, memory_cost=65540) }}"
             SIGNUPS_ALLOWED: false
             DOMAIN: "https://{{ vaultwarden_fqdn }}"

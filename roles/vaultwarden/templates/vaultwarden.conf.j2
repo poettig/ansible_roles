@@ -20,10 +20,6 @@
     handle {
         # No internet access to the admin panel, use SSH tunneling to access the Vaultwarden admin interface
         respond /admin* 404
-        reverse_proxy localhost:7843 {
-            # Send the true remote IP to Rocket, so that Vaultwarden can put this in the
-            # log, so that fail2ban can ban the correct IP.
-            header_up X-Real-IP {remote_host}
-        }
+        reverse_proxy localhost:7843
     }
 }
