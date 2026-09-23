@@ -65,11 +65,6 @@ alias yay="sudo apt update && sudo apt upgrade"
 alias autoremove='sudo pacman -Rns $(pacman -Qtdq)'
 {% endif %}
 
-{% if zsh_user_info.uid != 0 %}
-# Unlock sudo
-rbw get {{ zsh_sudo_password_bitwarden_id }} | sudo -S true > /dev/null 2>&1
-
-{% endif %}
 function mkcd() {
 	mkdir -p $1
 	cd $1
@@ -86,6 +81,10 @@ acp() {
 }
 
 {% if zsh_user_info.uid != 0 %}
+unlock_sudo() {
+	rbw get {{ zsh_sudo_password_bitwarden_id }} | sudo -S true > /dev/null 2>&1
+}
+
 {% for profile in zsh_bitwarden_profiles %}
 unlock{% if profile.name %}_{{ profile.name }}{% endif %}() {
 	{% if profile.name != "" %}RBW_PROFILE={{ profile.name }} {% endif %}rbw unlock || exit
@@ -135,13 +134,19 @@ run_program_if_not_running() {
 
 # startup
 startup() {
+	# Unlock stuff
+	unlock_sudo
+	unlock
+
 {% if zsh_startup_programs is defined and zsh_startup_programs %}
+	# Start programs
 {% for prog in zsh_startup_programs %}
 	run_program_if_not_running {{ prog }}
 {% endfor %}
 {% endif %}
 {% if zsh_startup_programs_light_theme is defined and zsh_startup_programs_light_theme %}
 
+	# Start programs with forced light theme
 	export GTK_THEME={{ zsh_startup_light_theme_name }}
 {% for prog in zsh_startup_programs_light_theme %}
 	run_program_if_not_running {{ prog }}
