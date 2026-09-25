@@ -126,9 +126,8 @@ run_program_if_not_running() {
 	fi
 
 	# Run program and disown immediately (&!)
-	# Do this in a subshell to not have the job notification printed
 	echo -n "Launching $progname using command $cmd..."
-	($cmd > /dev/null 2>&1 &!)
+	$cmd > /dev/null 2>&1 &!
 	echo " Done."
 }
 
@@ -153,6 +152,7 @@ startup() {
 {% endfor %}
 	unset GTK_THEME
 {% endif %}
+
 	exit
 }
 
