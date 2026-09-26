@@ -93,7 +93,6 @@ security {
 {% for authorization_policy in caddy_security_authorization_policies %}
     authorization policy {{ authorization_policy.name }} {
         set auth url {{ authorization_policy.url }}
-        set access_token cookie name AUTHP_ACCESS_TOKEN
         crypto key verify {{ authorization_policy.jwt_key }}
 {% if authorization_policy.allowed_roles is defined %}
         allow roles {{ authorization_policy.allowed_roles + [authorization_policy.name] | join(" ") }}
