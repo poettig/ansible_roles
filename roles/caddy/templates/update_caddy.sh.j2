@@ -15,6 +15,12 @@ get_latest_release() {
 	git_changelog_url=$(echo "$git_releases" | jq -r 'first(.[] | select(.prerelease==false)) | .html_url // empty' 2> /dev/null)
 
 	if [ -z "$git_version" ] || [ "$git_version" = "null" ]; then
+		git_releases=$(curl -sL "https://api.github.com/repos/${repo}/tags" 2> /dev/null) || { echo "Failed to get tags for ${repo} from Github"; exit 1; }
+		git_version=$(echo "$git_releases" | jq -r 'first(.[]) | .name // empty' 2> /dev/null)
+		git_changelog_url="https://github.com/${repo}/releases/tag/${git_version}"
+	fi
+
+	if [ -z "$git_version" ] || [ "$git_version" = "null" ]; then
 		echo "Failed to get latest version number from releases for ${repo}."
 		exit 1
 	fi
@@ -99,7 +105,7 @@ if [[ "$update_needed" == true || "$1" == "-f" ]]; then
 	echo "Updated caddy from '$old_version' to '$({{ caddy_executables_directory }}/caddy version | cut -d' ' -f1)'. Current git release is '$caddy_git_version'."
 	for module in "${caddy_modules[@]}"; do
 		new_mod_version=$(echo "$new_build_info" | awk -v m="$module" '$1 == "dep" && ($2 == m || $2 == "github.com/" m) {print $3}')
-		echo "Updated module '${1#github.com/}' from '${module_old_versions[$module]}' to '$new_mod_version'. Current git release is '${module_git_versions[$module]}'."
+		echo "Updated module '${module#github.com/}' from '${module_old_versions[$module]}' to '$new_mod_version'. Current git release is '${module_git_versions[$module]}'."
 	done
 	echo "--------------------------------------------"
 	echo
