@@ -1,11 +1,27 @@
 #!/usr/bin/env bash
 
-# There are no actual quotes, just jinja2
-# shellcheck disable=SC2089
-XCADDY_BUILD="/tmp/xcaddy build{{ [' --with'] | product(query('community.general.merge_variables', 'caddy_modules', pattern_type='prefix') | flatten) | map('join', ' ') | join('') }} --output {{ caddy_executables_directory }}/caddy"
+{% set caddy_modules = query('community.general.merge_variables', 'caddy_modules_', pattern_type='prefix') | flatten %}
+caddy_modules=(
+{% for module in caddy_modules %}
+	"{{ module }}"
+{% endfor %}
+)
+XCADDY_BUILD="/tmp/xcaddy build{{ [' --with'] | product(caddy_modules) | map('join', ' ') | join('') }} --output {{ caddy_executables_directory }}/caddy"
+
+get_latest_release() {
+	local repo="${1#github.com/}"
+	git_releases=$(curl -sL "https://api.github.com/repos/${repo}/releases" 2> /dev/null) || { echo "Failed to get releases for ${repo} from Github"; exit 1; }
+	git_version=$(echo "$git_releases" | jq -r 'first(.[] | select(.prerelease==false)) | .tag_name // empty' 2> /dev/null)
+	git_changelog_url=$(echo "$git_releases" | jq -r 'first(.[] | select(.prerelease==false)) | .html_url // empty' 2> /dev/null)
+
+	if [ -z "$git_version" ] || [ "$git_version" = "null" ]; then
+		echo "Failed to get latest version number from releases for ${repo}."
+		exit 1
+	fi
+}
 
 do_update() {
-	curl -s https://api.github.com/repos/caddyserver/xcaddy/releases/latest | jq -r '.assets[] | select(.name | contains("linux_amd64.tar.gz")) | .browser_download_url' | wget -q -i - -O - | tar xzf - -C /tmp;
+	curl -sL https://api.github.com/repos/caddyserver/xcaddy/releases/latest | jq -r '.assets[] | select(.name | contains("linux_amd64.tar.gz")) | .browser_download_url' | wget -q -i - -O - | tar xzf - -C /tmp;
 
 	# sort -V sorts semantic versioning to ascending order.
 	# The next two lines therefore ensure that the hardcoded 1.21 is the first version in order, i.e. the installed go version is the same or higher.
@@ -30,23 +46,42 @@ do_update() {
 
 if [ -f "{{ caddy_executables_directory }}/caddy" ]; then
 	old_version=$({{ caddy_executables_directory }}/caddy version | cut -d' ' -f1) || { echo "Failed to get current caddy version."; exit 1; }
+	build_info=$({{ caddy_executables_directory }}/caddy build-info 2> /dev/null)
 else
 	old_version=""
+	build_info=""
 fi
 
-git_releases=$(curl -L https://api.github.com/repos/caddyserver/caddy/releases 2> /dev/null) || { echo "Failed to get releases from Github"; exit 1; }
-git_version=$(echo "$git_releases" | jq -r 'first(.[] | select(.prerelease==false)) | .tag_name') || { echo "Failed to get latest version number from releases."; exit 1; }
-git_changelog_url=$(echo "$git_releases" | jq -r 'first(.[] | select(.prerelease==false)) | .html_url')
+get_latest_release "caddyserver/caddy"
+caddy_git_version="$git_version"
+caddy_git_changelog_url="$git_changelog_url"
 
-if [[ "$old_version" != "$git_version" || "$1" == "-f" ]] || [ -f "$HOME/.force_rebuild" ]; then
+update_needed=false
+
+if [ "$old_version" != "$caddy_git_version" ]; then
+	update_needed=true
+fi
+
+declare -A module_old_versions
+declare -A module_git_versions
+declare -A module_changelog_urls
+
+for module in "${caddy_modules[@]}"; do
+	get_latest_release "$module"
+	module_git_versions["$module"]="$git_version"
+	module_changelog_urls["$module"]="$git_changelog_url"
+	old_mod_version=$(echo "$build_info" | awk -v m="$module" '$1 == "dep" && ($2 == m || $2 == "github.com/" m) {print $3}')
+	module_old_versions["$module"]="$old_mod_version"
+	if [ "$old_mod_version" != "$git_version" ]; then
+		update_needed=true
+	fi
+done
+
+if [[ "$update_needed" == true || "$1" == "-f" ]]; then
 	if ! do_update; then
 		echo
 		echo "Caddy update failed."
 		exit 1
-	fi
-
-	if rm "$HOME/.force_rebuild"; then
-		echo "Deleted force rebuild flag file."
 	fi
 
 	echo
@@ -59,10 +94,18 @@ if [[ "$old_version" != "$git_version" || "$1" == "-f" ]] || [ -f "$HOME/.force_
 	echo "--------------------------------------------"
 	journalctl --no-pager -q _SYSTEMD_INVOCATION_ID="$(systemctl show --value -p InvocationID caddy)"
 	echo
+	new_build_info=$({{ caddy_executables_directory }}/caddy build-info 2> /dev/null)
 	echo "--------------------------------------------"
-	echo "Updated caddy to '$({{ caddy_executables_directory }}/caddy version | cut -d' ' -f1)'. Old version was '$old_version', current git version is '$git_version'."
+	echo "Updated caddy from '$old_version' to '$({{ caddy_executables_directory }}/caddy version | cut -d' ' -f1)'. Current git release is '$caddy_git_version'."
+	for module in "${caddy_modules[@]}"; do
+		new_mod_version=$(echo "$new_build_info" | awk -v m="$module" '$1 == "dep" && ($2 == m || $2 == "github.com/" m) {print $3}')
+		echo "Updated module '${1#github.com/}' from '${module_old_versions[$module]}' to '$new_mod_version'. Current git release is '${module_git_versions[$module]}'."
+	done
 	echo "--------------------------------------------"
 	echo
-	echo "You can find the changelog at $git_changelog_url"
+	echo "You can find the changelog at $caddy_git_changelog_url"
+	for module in "${caddy_modules[@]}"; do
+		echo "You can find the changelog for $module at ${module_changelog_urls[$module]}"
+	done
 	echo
 fi
