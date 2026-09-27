@@ -56,14 +56,12 @@ run_compact() {
 
 	echo "2. Check integrity"
 	if ! ssh_or_no_ssh "$compact_mode" "$compact_borg_path" "$compact_ssh_target" "$password" -vp check --verify-data "$compact_repo_path"; then
-		echo "ERROR: Failed integrity check. Trying repair, CTRL+C to cancel..."
+		echo "ERROR: Failed integrity check. Try manual repair, then compact:"
+		echo "borg -vp check --repair --verify-data $compact_repo_path"
+		echo "borg -vp compact $compact_repo_path"
 		echo
-		if ! ssh_or_no_ssh "$compact_mode" "$compact_borg_path" "$compact_ssh_target" "$password" -vp check --repair --verify-data "$compact_repo_path"; then
-			echo "CRITICAL: Failed repair."
-			echo
-			echo
-			return
-		fi
+		echo
+		return
 	fi
 	echo
 
@@ -115,7 +113,7 @@ done
 
 # Open ssh multiplex session
 if [ -n "$system_to_run_on" ]; then
-	ssh "$system_to_run_on" true
+	ssh -A "$system_to_run_on" true
 fi
 
 # Run compaction sequence
