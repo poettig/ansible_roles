@@ -6,7 +6,24 @@ caddy_modules=(
 	"{{ module }}"
 {% endfor %}
 )
-XCADDY_BUILD="/tmp/xcaddy build{{ [' --with'] | product(caddy_modules) | map('join', ' ') | join('') }} --output {{ caddy_executables_directory }}/caddy"
+# The get_latest_release calls below determine the exact versions to upgrade to.
+# The xcaddy build command is assembled at runtime from those versions so that
+# caddy itself and every module is pinned to the version that will be installed.
+XCADDY_BUILD="/tmp/xcaddy build"
+
+force=false
+dry_run=false
+for arg in "$@"; do
+	case "$arg" in
+		-f|--force) force=true ;;
+		-n|--dry-run) dry_run=true ;;
+		*)
+			echo "Unknown argument: $arg" >&2
+			echo "Usage: $0 [-f|--force] [-n|--dry-run]" >&2
+			exit 2
+			;;
+	esac
+done
 
 get_latest_release() {
 	local repo="${1#github.com/}"
@@ -29,21 +46,21 @@ get_latest_release() {
 do_update() {
 	curl -sL https://api.github.com/repos/caddyserver/xcaddy/releases/latest | jq -r '.assets[] | select(.name | contains("linux_amd64.tar.gz")) | .browser_download_url' | wget -q -i - -O - | tar xzf - -C /tmp;
 
-	# sort -V sorts semantic versioning to ascending order.
-	# The next two lines therefore ensure that the hardcoded 1.21 is the first version in order, i.e. the installed go version is the same or higher.
-	go_version=$(go version 2> /dev/null | grep -oP "\d+\.\d+\.\d+")
-	if command -v go > /dev/null 2>&1 && ! [ "$go_version" = "$(echo -e "1.21\n$go_version" | sort -V | head -n1)" ]; then
+	if command -v go > /dev/null 2>&1; then
 		# Go installed in correct version, use directly
 		echo "Updating caddy using local go compiler..."
 		$XCADDY_BUILD 2>&1
 	elif command -v podman > /dev/null 2>&1; then
 		echo "Updating caddy using podman..."
+		local ret=0
 		podman run --pull=newer -q -v {{ caddy_executables_directory }}:{{ caddy_executables_directory }} -v /tmp/xcaddy:/tmp/xcaddy --rm docker.io/golang:latest bash -c "
+			set -e
 			apt-get -qq update 2>&1
 			apt-get -qq install curl jq wget tar 2>&1
 			$XCADDY_BUILD 2>&1
-		"
+		" || ret=$?
 		podman image rm docker.io/golang  # Clean up golang image as it uses 4 GB of storage space
+		return $ret
 	else
 		echo "Neither go nor podman installed, failed to install."
 		return 1
@@ -61,6 +78,7 @@ fi
 get_latest_release "caddyserver/caddy"
 caddy_git_version="$git_version"
 caddy_git_changelog_url="$git_changelog_url"
+XCADDY_BUILD="$XCADDY_BUILD $caddy_git_version"
 
 update_needed=false
 
@@ -81,9 +99,31 @@ for module in "${caddy_modules[@]}"; do
 	if [ "$old_mod_version" != "$git_version" ]; then
 		update_needed=true
 	fi
+	XCADDY_BUILD="$XCADDY_BUILD --with $module@$git_version"
 done
 
-if [[ "$update_needed" == true || "$1" == "-f" ]]; then
+XCADDY_BUILD="$XCADDY_BUILD --output {{ caddy_executables_directory }}/caddy"
+
+if [[ "$update_needed" == true || "$force" == true ]]; then
+	echo "The following updates are about to be done:"
+	if [ -n "$old_version" ]; then
+		echo "  - caddy: '$old_version' -> '$caddy_git_version'"
+	else
+		echo "  - caddy: not installed -> '$caddy_git_version'"
+	fi
+	for module in "${caddy_modules[@]}"; do
+		echo "  - module '${module#github.com/}': '${module_old_versions[$module]:-not installed}' -> '${module_git_versions[$module]}'"
+	done
+	echo
+	echo "The xcaddy build command is:"
+	echo "  $XCADDY_BUILD"
+	echo
+
+	if [[ "$dry_run" == true ]]; then
+		echo "Dry-run mode, not performing the update."
+		exit 0
+	fi
+
 	if ! do_update; then
 		echo
 		echo "Caddy update failed."
