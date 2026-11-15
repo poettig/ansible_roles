@@ -50,3 +50,32 @@
       environment:
         BORG_PASSPHRASE: "{% if item in hostvars %}{{ hostvars[item].backup_passphrase }}{% else %}{{ backup_passphrases_external_hosts[item] }}{% endif %}"
       ignore_errors: "{{ ansible_check_mode }}"
+
+    - name: "Get additional free space setting for backup repo {{ item }}"
+      become: true
+      become_user: "backup"
+      become_method: "ansible.builtin.sudo"
+      become_flags: "-i"  # Necessary for borg executable to be found
+      ansible.builtin.command:
+        cmd: "borg config {{ backup_repos_homedir }}/{{ item }} additional_free_space"
+      check_mode: false  # Always run, even in check mode
+      changed_when: false
+      ignore_errors: "{{ ansible_check_mode }}"
+      register: backup_repo_additional_free_space
+      when: backup_target_repos_additional_free_space is defined
+
+    - name: "Set additional free space setting for backup repo {{ item }}"
+      become: true
+      become_user: "backup"
+      become_method: "ansible.builtin.sudo"
+      become_flags: "-i"  # Necessary for borg executable to be found
+      ansible.builtin.command:
+        cmd: "borg config {{ backup_repos_homedir }}/{{ item }} additional_free_space {{ backup_target_repos_additional_free_space }}"
+      ignore_errors: "{{ ansible_check_mode }}"
+      register: backup_set_repo_additional_free_space
+      changed_when: backup_set_repo_additional_free_space.rc == 0
+      when:
+        - backup_target_repos_additional_free_space is defined
+        - backup_repo_additional_free_space is defined
+        - backup_repo_additional_free_space.rc == 0
+        - backup_repo_additional_free_space.stdout != backup_target_repos_additional_free_space
