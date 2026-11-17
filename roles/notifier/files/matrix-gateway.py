@@ -27,7 +27,8 @@ from linkify_it import LinkifyIt
 from PIL import Image
 
 HIDDEN_LABELS = {"grafana_folder", "repeat_alert"}
-MAX_FORMATTED_LENGTH = 15000
+# Leave room under Matrix's 64 KiB event limit for Megolm/base64 expansion and event metadata.
+MAX_MATRIX_EVENT_BYTES = 32 * 1024
 
 matrix_client: nio.AsyncClient | None = None
 verification_data: dict | None = None
@@ -386,28 +387,93 @@ def token_validity_check(
     return wrapper
 
 
+def is_too_large_error(error: object) -> bool:
+    if getattr(error, "status_code", None) == "M_TOO_LARGE":
+        return True
+
+    for response in (error, getattr(error, "response", None), getattr(error, "transport_response", None)):
+        if response is None:
+            continue
+        if getattr(response, "status", None) in (413, "413"):
+            return True
+        if getattr(response, "status_code", None) in (413, "413"):
+            return True
+
+    return False
+
+
+def matrix_event_size(event_json: dict) -> int:
+    return len(nio.Api.to_json(event_json).encode("utf-8"))
+
+
+def informational_event(message: str) -> dict[str, str]:
+    return {
+        "msgtype": "m.text",
+        "body": message,
+        "format": "org.matrix.custom.html",
+        "formatted_body": f"<p>{html.escape(message)}</p>",
+    }
+
+
+async def send_size_limit_notice(client: nio.AsyncClient, room_id: str, event_json: dict) -> None:
+    try:
+        response = await client.room_send(
+            room_id,
+            "m.room.message",
+            content=event_json,
+            ignore_unverified_devices=True,
+        )
+    except asyncio.CancelledError:
+        raise
+    except Exception as ex:
+        raise RuntimeError(f"Failed to send Matrix message size notice to {room_id}: {ex}") from ex
+
+    if isinstance(response, nio.RoomSendError):
+        raise RuntimeError(f"Matrix rejected message size notice to {room_id}: {response}")
+
+
 @token_validity_check
-async def send_event(event_json: dict, rooms: list[str]) -> None:
+async def send_event(event_json: dict, rooms: list[str], too_large_event: dict[str, str] | None = None) -> None:
     client = get_matrix_client()
+    size_notice = too_large_event or informational_event(
+        "⚠️ A Matrix message exceeded the server's size limit and could not be sent."
+    )
 
     async def send_to_room(room_id: str) -> None:
+        if too_large_event is not None and event_json == too_large_event:
+            await send_size_limit_notice(client, room_id, size_notice)
+            return
+
         while True:
             try:
-                await client.room_send(
+                response = await client.room_send(
                     room_id,
                     "m.room.message",
                     content=event_json,
                     ignore_unverified_devices=True,
                 )
-
-                return
             except asyncio.CancelledError:
                 # Cancellations should be on purpose, don't retry.
                 # Re-raise to ensure proper cancellation.
                 raise
             except Exception as e:
+                if is_too_large_error(e):
+                    logging.warning(f"Matrix message for {room_id} exceeded the size limit; sending a notice instead.")
+                    await send_size_limit_notice(client, room_id, size_notice)
+                    return
+
                 logging.error(f"Sending message failed, will retry in 5 seconds: {e}")
                 await asyncio.sleep(5)
+                continue
+
+            if isinstance(response, nio.RoomSendError):
+                if is_too_large_error(response):
+                    logging.warning(f"Matrix message for {room_id} exceeded the size limit; sending a notice instead.")
+                    await send_size_limit_notice(client, room_id, size_notice)
+                    return
+                raise RuntimeError(f"Matrix rejected message to {room_id}: {response}")
+
+            return
 
     tasks = []
     for room in rooms:
@@ -624,6 +690,7 @@ def html_list(items: dict) -> str:
 
     return "".join(result)
 
+
 def alert_headline(alert: GrafanaAlert, common_labels: dict) -> tuple[str, set[str]]:
     labels = visible_labels(alert.labels or {})
 
@@ -718,7 +785,7 @@ def render_grafana_alert(
         emoji = "❓"
         status_text = "no data"
     elif alert.status == GrafanaStatus.FIRING:
-        emoji =  "🔥"
+        emoji = "🔥"
     else:
         emoji = "✅"
 
@@ -726,10 +793,11 @@ def render_grafana_alert(
     summary = (alert.annotations or {}).get("summary", "")
 
     if alert.status == GrafanaStatus.FIRING:
-        when = f"since {alert.starts_at.strftime('%Y-%m-%d %H:%M')}"
+        when = f" since {alert.starts_at.strftime('%Y-%m-%d %H:%M')}"
     else:
         when = (
-            f"from {alert.starts_at.strftime('%Y-%m-%d %H:%M')} to {alert.ends_at.strftime('%Y-%m-%d %H:%M')} "
+            f", was firing from {alert.starts_at.strftime('%Y-%m-%d %H:%M')} "
+            f"to {alert.ends_at.strftime('%Y-%m-%d %H:%M')} "
             f"({format_timedelta(alert.ends_at - alert.starts_at)})"
         )
 
@@ -742,7 +810,7 @@ def render_grafana_alert(
     body = []
     if summary:
         body.append(f"<p>{linkify(summary)}</p>")
-    body.append(f"<p><i>{esc(status_text)} {esc(when)}</i></p>")
+    body.append(f"<p><i>{esc(status_text)}{esc(when)}</i></p>")
 
     values = alert_values(alert)
     if values:
@@ -771,7 +839,7 @@ def render_grafana_alert(
     if links:
         body.append(f"<p>{' · '.join(links)}</p>")
 
-    formatted = f"<details><summary>{emoji} <b>{linkify(headline)}</b></summary>{''.join(body)}</details>"
+    formatted = f"<details><summary>{emoji} <b>{linkify(headline)}</b></summary><br/>{''.join(body)}</details>"
     plain = f"{emoji} {headline}" + (f" — {summary}" if summary else "")
     return plain, formatted
 
@@ -833,13 +901,14 @@ async def send_file(file: fastapi.UploadFile, rooms: list[str]) -> None:
 async def grafana_alerts(data: GrafanaAlertManagerMessage) -> None:
     headline_common_labels = alert_headline_common_labels(data.alerts)
     alerts = [
-        render_grafana_alert(alert, common_labels) for alert, common_labels in zip(data.alerts, headline_common_labels, strict=False)
+        render_grafana_alert(alert, common_labels)
+        for alert, common_labels in zip(data.alerts, headline_common_labels, strict=False)
     ]
     no_data_count = sum(is_no_data_alert(alert) for alert in data.alerts)
     firing_count = sum(alert.status == GrafanaStatus.FIRING and not is_no_data_alert(alert) for alert in data.alerts)
     resolved_count = sum(alert.status == GrafanaStatus.RESOLVED for alert in data.alerts)
 
-    header_parts = []
+    header_parts = ["Grafana alerts"]
     if firing_count:
         header_parts.append(f"🔥 {firing_count} firing")
     if no_data_count:
@@ -848,9 +917,7 @@ async def grafana_alerts(data: GrafanaAlertManagerMessage) -> None:
         header_parts.append(f"✅ {resolved_count} resolved")
 
     common_labels = visible_labels(data.common_labels or {})
-    header = " · ".join(header_parts) or "Grafana alerts"
-    if common_labels.get("alertname"):
-        header += f" — {common_labels['alertname']}"
+    header = " · ".join(header_parts)
     if len(data.alerts) > 1:
         other_common_labels = {key: value for key, value in common_labels.items() if key != "alertname"}
         if other_common_labels:
@@ -863,23 +930,10 @@ async def grafana_alerts(data: GrafanaAlertManagerMessage) -> None:
         plain_parts.append(warning)
         html_parts.append(f"<p>{esc(warning)}</p>")
 
+    plain_parts.extend(plain_alert for plain_alert, _ in alerts)
+    html_parts.extend(formatted_alert for _, formatted_alert in alerts)
+
     formatted_header = f"<h4>{linkify(header)}</h4>"
-    formatted_length = len(formatted_header) + sum(len(part) for part in html_parts)
-    included_alerts = 0
-    for plain_alert, formatted_alert in alerts:
-        if html_parts and formatted_length + len(formatted_alert) > MAX_FORMATTED_LENGTH:
-            break
-
-        plain_parts.append(plain_alert)
-        html_parts.append(formatted_alert)
-        formatted_length += len(formatted_alert)
-        included_alerts += 1
-
-    omitted_alerts = len(data.alerts) - included_alerts
-    if omitted_alerts:
-        omitted_message = f"… and {omitted_alerts} more {inflector.plural('alert', omitted_alerts)} omitted."
-        plain_parts.append(omitted_message)
-        html_parts.append(f"<p>{esc(omitted_message)}</p>")
 
     event_json = {
         "msgtype": "m.text",
@@ -887,7 +941,27 @@ async def grafana_alerts(data: GrafanaAlertManagerMessage) -> None:
         "format": "org.matrix.custom.html",
         "formatted_body": f"{formatted_header}{''.join(html_parts)}",
     }
-    await send_event(event_json, [room_mappings["peet"]])
+    counts = []
+    if firing_count:
+        counts.append(f"🔥 {firing_count} firing")
+    if no_data_count:
+        counts.append(f"❓ {no_data_count} with no data")
+    if resolved_count:
+        counts.append(f"✅ {resolved_count} resolved")
+    count_summary = f"Alerts: {', '.join(counts)}." if counts else "No alert details were included."
+    omitted_summary = ""
+    if data.truncated_alerts:
+        omitted_summary = (
+            f" ⚠️ Grafana omitted {data.truncated_alerts} additional {inflector.plural('alert', data.truncated_alerts)}."
+        )
+    size_notice = informational_event(
+        f"⚠️ The Grafana notification was too large to send to the [matrix] homeserver. "
+        f"{count_summary}{omitted_summary} Check Grafana for details."
+    )
+    if matrix_event_size(event_json) > MAX_MATRIX_EVENT_BYTES:
+        event_json = size_notice
+
+    await send_event(event_json, [room_mappings["peet"]], too_large_event=size_notice)
 
 
 # Init code that has to be run on import of the script by uvicorn as well
