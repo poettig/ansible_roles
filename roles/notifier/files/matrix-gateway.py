@@ -955,7 +955,7 @@ async def grafana_alerts(data: GrafanaAlertManagerMessage) -> None:
             f" ⚠️ Grafana omitted {data.truncated_alerts} additional {inflector.plural('alert', data.truncated_alerts)}."
         )
     size_notice = informational_event(
-        f"⚠️ The Grafana notification was too large to send to the [matrix] homeserver. "
+        f"⚠️ A Grafana notification was too large to send to the [matrix] homeserver. "
         f"{count_summary}{omitted_summary} Check Grafana for details."
     )
     if matrix_event_size(event_json) > MAX_MATRIX_EVENT_BYTES:
