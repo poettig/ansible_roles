@@ -27,8 +27,6 @@ from linkify_it import LinkifyIt
 from PIL import Image
 
 HIDDEN_LABELS = {"grafana_folder", "repeat_alert"}
-# Leave room under Matrix's 64 KiB event limit for Megolm/base64 expansion and event metadata.
-MAX_MATRIX_EVENT_BYTES = 32 * 1024
 
 matrix_client: nio.AsyncClient | None = None
 verification_data: dict | None = None
@@ -400,10 +398,6 @@ def is_too_large_error(error: object) -> bool:
             return True
 
     return False
-
-
-def matrix_event_size(event_json: dict) -> int:
-    return len(nio.Api.to_json(event_json).encode("utf-8"))
 
 
 def informational_event(message: str) -> dict[str, str]:
@@ -958,8 +952,6 @@ async def grafana_alerts(data: GrafanaAlertManagerMessage) -> None:
         f"⚠️ A Grafana notification was too large to send to the [matrix] homeserver. "
         f"{count_summary}{omitted_summary} Check Grafana for details."
     )
-    if matrix_event_size(event_json) > MAX_MATRIX_EVENT_BYTES:
-        event_json = size_notice
 
     await send_event(event_json, [room_mappings["peet"]], too_large_event=size_notice)
 
