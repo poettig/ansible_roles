@@ -2,7 +2,7 @@
 
 ssh_with_temp_multiplexer() {
 	local control_dir="${BORG_COMPACT_SSH_CONTROL_DIR:-}"
-	local -a ssh_options=(-A -o ServerAliveInterval=30 -o ServerAliveCountMax=3)
+	local -a ssh_options=(-o ServerAliveInterval=30 -o ServerAliveCountMax=3 -o SendEnv=BORG_PASSPHRASE)
 
 	if [ -n "$control_dir" ]; then
 		ssh_options+=(-o ControlMaster=auto -o ControlPersist=600 -o "ControlPath=$control_dir/%C")
@@ -26,11 +26,9 @@ ssh_or_no_ssh() {
 	shift 4
 
 	if [ "$mode" = "ssh" ]; then
-		# shellcheck disable=SC2154
-		# (defined via tmux variable declaration)
-		# -q for silence, -t for tty allocation - without it, SIGINT will not terminate the remote command
+		# -q for silence, -tt for tty allocation - without it, SIGINT will not terminate the remote command
 		time {
-			echo "$password" | ssh_with_temp_multiplexer -Aqt "$ssh_target" "export BORG_PASSPHRASE=\$(cat); export BORG_RSH='ssh -o StrictHostKeyChecking=accept-new'; $borg_path $*"
+			BORG_PASSPHRASE="$password" ssh_with_temp_multiplexer -qtt "$ssh_target" "if [ -z \"\$BORG_PASSPHRASE\" ]; then echo 'BORG_PASSPHRASE was not accepted by the SSH server; configure AcceptEnv BORG_PASSPHRASE.' >&2; exit 1; fi; export BORG_RSH='ssh -o StrictHostKeyChecking=accept-new'; $borg_path $*"
 		}
 	elif [ "$mode" = "direct" ]; then
 		time BORG_RSH="ssh -o StrictHostKeyChecking=accept-new" BORG_PASSPHRASE="$password" borg "$@"
@@ -132,9 +130,9 @@ control_dir=$(mktemp -d) || {
 export BORG_COMPACT_SSH_CONTROL_DIR="$control_dir"
 printf -v quoted_control_dir '%q' "$control_dir"
 
-# Open ssh multiplex session
+# Open ssh multiplex session with agent forwarding once
 if [ -n "$system_to_run_on" ]; then
-	ssh_with_temp_multiplexer -A "$system_to_run_on" true
+	ssh_with_temp_multiplexer -A -o SendEnv=BORG_PASSPHRASE "$system_to_run_on" true
 fi
 
 # Run compaction sequence

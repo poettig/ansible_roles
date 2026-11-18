@@ -11,7 +11,7 @@
     - name: "Assert that notifier.py exists"
       ansible.builtin.assert:
         that: backup_notifier_stat.stat.exists
-        msg: "/usr/local/bin/notifier.py does not exist, cannot proceed."
+        fail_msg: "/usr/local/bin/notifier.py does not exist, cannot proceed."
 
 - name: "Install borg"
   ansible.builtin.include_tasks: install_borg.yml
@@ -81,3 +81,29 @@
     mode: "0755"
   tags: borg-compact
   when: backup_install_borg_compact
+
+- name: "Allow Borg compact passphrase forwarding on selected SSH hosts"
+  delegate_to: "{{ item.host }}"
+  ansible.builtin.copy:
+    src: "borg_compact_acceptenv.conf"
+    dest: "/etc/ssh/sshd_config.d/borg_compact_acceptenv.conf"
+    mode: "0644"
+  loop: "{{ backup_borg_compact_acceptenv_hosts }}"
+  loop_control:
+    label: "{{ item.host }}"
+  register: backup_borg_compact_acceptenv_config
+  when:
+    - backup_install_borg_compact
+    - backup_borg_compact_acceptenv_hosts | length > 0
+  tags: borg-compact
+
+- name: "Reload SSH on hosts with changed Borg compact AcceptEnv config" # noqa no-handler
+  delegate_to: "{{ item.item.host }}"
+  ansible.builtin.systemd_service:
+    name: "{{ item.item.sshd_service_name }}"
+    state: reloaded
+  loop: "{{ backup_borg_compact_acceptenv_config.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item.host }}"
+  when: item.changed | default(false)
+  tags: borg-compact
