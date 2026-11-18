@@ -1,5 +1,16 @@
 #!/usr/bin/env bash
 
+ssh_with_temp_multiplexer() {
+	local control_dir="${BORG_COMPACT_SSH_CONTROL_DIR:-}"
+	local -a ssh_options=(-A -o ServerAliveInterval=30 -o ServerAliveCountMax=3)
+
+	if [ -n "$control_dir" ]; then
+		ssh_options+=(-o ControlMaster=auto -o ControlPersist=600 -o "ControlPath=$control_dir/%C")
+	fi
+
+	ssh "${ssh_options[@]}" "$@"
+}
+
 show_help_and_exit() {
 	echo "borg-compact -f <system-to-run-compaction-from> -r <repo-to-compact>"
 	echo "  Without -f, compaction is run from the local system"
@@ -18,7 +29,9 @@ ssh_or_no_ssh() {
 		# shellcheck disable=SC2154
 		# (defined via tmux variable declaration)
 		# -q for silence, -t for tty allocation - without it, SIGINT will not terminate the remote command
-		echo "$password" | time ssh -Aqt "$ssh_target" "export BORG_PASSPHRASE=\$(cat); export BORG_RSH='ssh -o StrictHostKeyChecking=accept-new'; $borg_path $*"
+		time {
+			echo "$password" | ssh_with_temp_multiplexer -Aqt "$ssh_target" "export BORG_PASSPHRASE=\$(cat); export BORG_RSH='ssh -o StrictHostKeyChecking=accept-new'; $borg_path $*"
+		}
 	elif [ "$mode" = "direct" ]; then
 		time BORG_RSH="ssh -o StrictHostKeyChecking=accept-new" BORG_PASSPHRASE="$password" borg "$@"
 	else
@@ -111,9 +124,17 @@ while getopts "hf:r:" opt; do
 	esac
 done
 
+# Use a private control path so this script never reuses a user's existing master.
+control_dir=$(mktemp -d) || {
+	echo "ERROR: Failed to create a private SSH control directory."
+	exit 1
+}
+export BORG_COMPACT_SSH_CONTROL_DIR="$control_dir"
+printf -v quoted_control_dir '%q' "$control_dir"
+
 # Open ssh multiplex session
 if [ -n "$system_to_run_on" ]; then
-	ssh -A "$system_to_run_on" true
+	ssh_with_temp_multiplexer -A "$system_to_run_on" true
 fi
 
 # Run compaction sequence
@@ -128,7 +149,7 @@ for i in "${!configs[@]}"; do
 
 	# Open ssh multiplex session to ssh target
 	if [ "$compact_ssh_target" != "null" ]; then
-		ssh "$compact_ssh_target" true
+		ssh_with_temp_multiplexer "$compact_ssh_target" true
 	fi
 
 	if tmux has-session -t compact 2> /dev/null; then
@@ -140,6 +161,7 @@ for i in "${!configs[@]}"; do
 	tmux send-keys "unset HISTFILE" Enter
 	tmux send-keys "source $SCRIPTPATH/$(basename "$0") --source" Enter
 	tmux send-keys "export system_to_run_on=$system_to_run_on" Enter
+	tmux send-keys "export BORG_COMPACT_SSH_CONTROL_DIR=$quoted_control_dir" Enter
 	tmux send-keys "run_compact '${configs[$i]}'" Enter
 
 	if [ -n "$repo_name" ]; then
@@ -148,7 +170,7 @@ for i in "${!configs[@]}"; do
 done
 
 if ! tmux has-session -t compact 2> /dev/null; then
-	echo No compaction session started. Did you try to select a nonexistent compaction?
+	echo "No compaction session started. Did you try to select a nonexistent compaction?"
 	exit 1
 fi
 
