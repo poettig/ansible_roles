@@ -132,7 +132,7 @@ printf -v quoted_control_dir '%q' "$control_dir"
 
 # Open ssh multiplex session with agent forwarding once
 if [ -n "$system_to_run_on" ]; then
-	ssh_with_temp_multiplexer -A -o SendEnv=BORG_PASSPHRASE "$system_to_run_on" true
+	ssh_with_temp_multiplexer -A "$system_to_run_on" true
 fi
 
 # Run compaction sequence

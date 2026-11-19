@@ -88,13 +88,11 @@
     src: "borg_compact_acceptenv.conf"
     dest: "/etc/ssh/sshd_config.d/borg_compact_acceptenv.conf"
     mode: "0644"
-  loop: "{{ backup_borg_compact_acceptenv_hosts }}"
+  loop: "{{ backup_borg_compact_acceptenv_hosts + (groups['backup_targets'] | map('community.general.dict_kv', 'host') | map('combine', {'ssh_service_name': 'ssh'})) }}"
   loop_control:
     label: "{{ item.host }}"
   register: backup_borg_compact_acceptenv_config
-  when:
-    - backup_install_borg_compact
-    - backup_borg_compact_acceptenv_hosts | length > 0
+  when: backup_install_borg_compact
   tags: borg-compact
 
 - name: "Reload SSH on hosts with changed Borg compact AcceptEnv config" # noqa no-handler
