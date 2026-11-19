@@ -80,7 +80,7 @@ acp() {
 	git push
 }
 
-{% if zsh_user_info.uid != 0 %}
+{% if zsh_user_info.uid != 0 and zsh_sudo_password_bitwarden_id is defined %}
 unlock_sudo() {
 	rbw get {{ zsh_sudo_password_bitwarden_id }} | sudo -S true > /dev/null 2>&1
 }
